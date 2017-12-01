@@ -5,3 +5,4 @@ dist
 packaging/deb
 packaging/msi
 packaging/build
+.DS_Store
