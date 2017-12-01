@@ -7,3 +7,4 @@ packaging/msi
 packaging/build
 packaging/licence.rtf
 .DS_Store
+_version.py
