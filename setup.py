@@ -14,32 +14,9 @@ from setuptools.command.build_py import build_py
 desc = "Quantiphyse package for Fabber"
 version = "0.0.1"
 
-SHLIB_DIR = "lib"
-SHLIB_TEMPLATE = "lib%s.so"
-
-class build_plugin(build_py):
-    def run(self):
-        build_py.run(self)
-        fsldir = os.environ.get("FSLDEVDIR", os.environ.get("FSLDIR", ""))
-        print("Coping Fabber libraries from %s" % fsldir)
-        rootdir = os.path.abspath(os.path.dirname(__file__))
-        print("Root dir is %s" % rootdir)
-        distdir = os.path.join(rootdir, "dist")
-        plugindir = os.path.join(distdir, "plugin")
-        shutil.rmtree(plugindir, ignore_errors=True)
-        os.makedirs(plugindir)
-
-        pkgdir = os.path.join(plugindir, "fabber_qp")
-        shutil.copytree(os.path.join(rootdir, "fabber_qp"), pkgdir)
-        LIB = os.path.join(fsldir, SHLIB_DIR, SHLIB_TEMPLATE % "fabbercore_shared")
-        print("%s -> %s" % (LIB, pkgdir))
-        shutil.copy(LIB, pkgdir)
-        PYAPI = os.path.join(fsldir, "lib", "python", "fabber.py")
-        shutil.copy(PYAPI, os.path.join(pkgdir, "fabber_api.py"))
-        
 # setup parameters
 setup(name='fabber_qp',
-      cmdclass={"build_plugin" : build_plugin},
+      cmdclass={},
       version=version,
       description=desc,
       long_description=desc,
