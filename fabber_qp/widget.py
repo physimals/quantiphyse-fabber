@@ -26,6 +26,7 @@ from quantiphyse.volumes.io import save
 
 from .process import FabberProcess
 from .dialogs import OptionsDialog, PriorsDialog
+from ._version import __version__
 
 FAB_CITE_TITLE = "Variational Bayesian inference for a non-linear forward model"
 FAB_CITE_AUTHOR = "Chappell MA, Groves AR, Whitcher B, Woolrich MW."
@@ -62,7 +63,7 @@ class FabberWidget(QpWidget):
         self.rundata["save-model-fit"] = ""
         #self.rundata["save-model-extras"] = ""
 
-        title = TitleWidget(self, title="Fabber Bayesian Model Fitting", help="fabber")
+        title = TitleWidget(self, title="Fabber Bayesian Model Fitting", subtitle="Plugin %s" % __version__, help="fabber")
         mainGrid.addWidget(title)
         
         cite = Citation(FAB_CITE_TITLE, FAB_CITE_AUTHOR, FAB_CITE_JOURNAL)
