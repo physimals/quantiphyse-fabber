@@ -25,7 +25,7 @@ def build_plugin(rootdir, distdir, platform):
     print("%s -> %s" % (LIB, packagedir))
     shutil.copy(LIB, packagedir)
     PYAPI = os.path.join(fsldir, "lib", "python", "fabber.py")
-    shutil.copy(PYAPI, os.path.join(pkgdir, "fabber_api.py"))
+    shutil.copy(PYAPI, os.path.join(packagedir, "fabber_api.py"))
 
 pkgdir = os.path.abspath(os.path.dirname(__file__))
 rootdir = os.path.abspath(os.path.join(pkgdir, os.pardir))
@@ -45,6 +45,8 @@ elif sys.platform.startswith("linux"):
     build_platform_package = create_deb.create_deb
 elif sys.platform.startswith("darwin"):
     platform="osx"
+    import create_dmg
+    build_platform_package = create_dmg.create_dmg
 
 os.system("rm -rf %s/dist" % rootdir)
 #os.system("python %s/update_version.py" % pkgdir)
