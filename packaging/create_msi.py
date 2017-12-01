@@ -76,6 +76,12 @@ WXS_TEMPLATE = """
    </Product>
 </Wix>"""
 
+# Minimal RTF template used to turn the license text into RTF
+RTF_TEMPLATE = """{\\rtf
+{\\fonttbl {\\f0 Courier;}}
+\\f0\\fs20 %s
+}"""
+
 def get_guid(path):
     """
     Return a GUID which is reproducibly tied to a file path
@@ -135,12 +141,22 @@ def create_wxs(name, distdir, version_str, wxs_fname):
     output.write(WXS_TEMPLATE % formatting_values)
     output.close()
 
+def convert_licence(txt_fname, rtf_fname):
+    f = open(txt_fname, "r")
+    txt = "\\line ".join(f.readlines())
+    f.close()
+    f = open(rtf_fname, "w")
+    f.write(RTF_TEMPLATE % txt)
+    f.close()
+
 def create_msi(name, distdir, pkgdir, version_str, version_str_display=None):
     """
     Create the MSI itself using WIX toolset
     """
     if version_str_display == None:
         version_str_display = version_str
+
+    convert_licence(os.path.join(pkgdir, os.pardir, "licence.md"), os.path.join(pkgdir, "licence.rtf"))
 
     msidir = os.path.join(pkgdir, MSI_SUBDIR)
     shutil.rmtree(msidir, ignore_errors=True)
