@@ -1,6 +1,25 @@
 import os, sys
 import platform
 import shutil
+import subprocess
+import re
+
+def update_version(name, rootdir):
+    # Full version includes the Git commit hash
+    full_version = subprocess.check_output('git describe --dirty', shell=True).strip(" \n")
+    vfile = open(os.path.join(rootdir, name, "_version.py"), "w")
+    vfile.write("__version__='%s'" % full_version)
+    vfile.close()
+
+    # Standardized version in form major.minor.patch-build
+    p = re.compile("v?(\d+\.\d+\.\d+(-\d+)?).*")
+    m = p.match(full_version)
+    if m is not None:
+        std_version = m.group(1)
+    else:
+        raise RuntimeError("Failed to parse version string %s" % full_version)
+
+    return full_version, std_version
 
 def get_lib_template(platform):
     if platform == "win32":
@@ -10,14 +29,14 @@ def get_lib_template(platform):
     else:
         return "lib", "lib%s.so"
 
-def build_plugin(rootdir, distdir, platform):
+def build_plugin(package_name, rootdir, distdir, platform):
     fsldir = os.environ.get("FSLDEVDIR", os.environ.get("FSLDIR", ""))
     print("Coping Fabber libraries from %s" % fsldir)
     print("Root dir is %s" % rootdir)
     os.makedirs(distdir)
 
-    packagedir = os.path.join(distdir, "fabber_qp")
-    shutil.copytree(os.path.join(rootdir, "fabber_qp"), packagedir)
+    packagedir = os.path.join(distdir, package_name)
+    shutil.copytree(os.path.join(rootdir, package_name), packagedir)
     
     # Copy Fabber shared lib and API
     shlib_dir, shlib_template = get_lib_template(platform)
@@ -30,8 +49,7 @@ def build_plugin(rootdir, distdir, platform):
 pkgdir = os.path.abspath(os.path.dirname(__file__))
 rootdir = os.path.abspath(os.path.join(pkgdir, os.pardir))
 distdir = os.path.join(rootdir, "dist", "plugin")
-version_str = "0.0.1-1"
-version_str_display = "0.0.1-1"
+package_name = "fabber_qp"
 
 sys.path.append(rootdir)
 
@@ -49,7 +67,12 @@ elif sys.platform.startswith("darwin"):
     build_platform_package = create_dmg.create_dmg
 
 os.system("rm -rf %s/dist" % rootdir)
-#os.system("python %s/update_version.py" % pkgdir)
+v = update_version(rootdir, package_name)
+print("Version updated to %s" % v[0])
+version_string_display = version_str = v[1]
+if len(v[1].split("-", 1)) > 0:
+    version_str_display = "snapshot"
+
 print("Building plugin")
-build_plugin(rootdir, distdir, platform)
-build_platform_package("fabber_qp", distdir, pkgdir, version_str, version_str_display)
+build_plugin(package_name, rootdir, distdir, platform)
+build_platform_package(package_name, distdir, pkgdir, v[1], version_str_display)

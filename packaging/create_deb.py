@@ -15,13 +15,13 @@ INSTALL_PREFIX = "usr/local"
 
 # Template for the DEBIAN/control file
 CONTROL_TEMPLATE = """
-Package: %(name)
+Package: %(name)s
 Architecture: %(arch)s
 Maintainer: Martin Craig <martin.craig@eng.ox.ac.uk>
 Depends: debconf (>= 0.5.00), quantiphyse
 Priority: optional
 Version: %(version_str)s
-Description: %(name) plugin for Quantiphyse
+Description: %(name)s plugin for Quantiphyse
 """
 
 def create_deb(name, distdir, pkgdir, version_str, version_str_display=None):
@@ -29,7 +29,7 @@ def create_deb(name, distdir, pkgdir, version_str, version_str_display=None):
         version_str_display = version_str
 
     formatting_values = {
-        "name" : name,
+        "name" : name.replace("_", "-"),
         "version_str" : version_str,
         "version_str_display" : version_str_display,
         "arch" : subprocess.check_output(['dpkg', '--print-architecture']).strip()
@@ -39,7 +39,7 @@ def create_deb(name, distdir, pkgdir, version_str, version_str_display=None):
     # Existing files may be owned by root
     os.system("sudo rm -rf %s" % debdir)
 
-    pkgname = "quantiphyse_%(version_str_display)s_%(arch)s" % formatting_values
+    pkgname = "%(name)s_%(version_str_display)s_%(arch)s" % formatting_values
     builddir = os.path.join(debdir, pkgname) 
 
     installdir = os.path.join(builddir, INSTALL_PREFIX, "quantiphyse", "packages", "plugins", name)
@@ -61,12 +61,3 @@ def create_deb(name, distdir, pkgdir, version_str, version_str_display=None):
 
     pkg = os.path.join(debdir, pkgname + ".deb")
     shutil.move(pkg, distdir)
-
-if __name__ == "__main__":
-    # Get absolute paths to the packaging dir and the root dir
-    pkgdir = os.path.abspath(os.path.dirname(__file__))
-    rootdir = os.path.abspath(os.path.join(pkgdir, os.pardir))
-    sys.path.append(rootdir)
-    #import update_version
-
-    create_deb(os.path.join(qpdir, "dist"), pkgdir, "0.0.1")
