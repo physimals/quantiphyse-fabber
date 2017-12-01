@@ -155,7 +155,7 @@ class FabberWidget(QpWidget):
         self.method_changed()
 
     def fab(self):
-        from fabber import FabberLib
+        from .fabber_api import FabberLib
         return FabberLib(rundata=self.rundata, auto_load_models=False)
 
     def model_group_changed(self):
