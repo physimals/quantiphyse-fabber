@@ -130,7 +130,7 @@ def add_apps_link(dmg_path):
         a = subprocess.check_output(['hdiutil', 'attach', '-noverify', dmg_path])
         lines = a.split('\n')
         path = lines[1].split("\t")[2]
-        os.system('ln -s /Applications/quantiphyse/packages/plugins "%s/Quantiphyse Plugins" ' % path) 
+        os.system('ln -s /Applications/quantiphyse.app/Contents/Resources/packages/plugins/ "%s/Quantiphyse Plugins" ' % path) 
     except:
         print("WARNING: Failed to add link to plugins folder")
         print(sys.exc_info())
@@ -138,7 +138,7 @@ def add_apps_link(dmg_path):
         if path is not None:
             os.system('hdiutil detach "%s" -quiet' % path)
     
-def create_msi(name, distdir, pkgdir, version_str, version_str_display=None):
+def create_dmg(name, distdir, pkgdir, version_str, version_str_display=None):
     if version_str_display == None:
         version_str_display = version_str
 
@@ -148,15 +148,15 @@ def create_msi(name, distdir, pkgdir, version_str, version_str_display=None):
         "name" : name,
         "version_str" : version_str,
         "version_str_display" : version_str_display,
-        "bundle_dir" : os.path.join(distdir, name),
+        "bundle_dir" : os.path.join(distdir),
         "dmg_name" : dmg_path,
         "dmg_temp_path" : dmg_temp_path,
     }
 
     os.system('hdiutil create -volname %(name)s -srcfolder %(bundle_dir)s -ov -quiet -format UDRW %(dmg_temp_path)s' % formatting_values)
-    license = os.path.join(pkgdir, os.pardir, "licence.md")
+    #license = os.path.join(pkgdir, os.pardir, "licence.md")
     add_apps_link(dmg_temp_path)
-    add_license(dmg_temp_path, license)
+    #add_license(dmg_temp_path, license)
     os.system('hdiutil convert %s -format ' % dmg_temp_path +
               'UDZO -imagekey zlib-devel=9 -ov -quiet -o %s' % dmg_path)
     os.remove(dmg_temp_path)
