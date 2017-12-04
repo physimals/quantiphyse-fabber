@@ -20,7 +20,7 @@ from PySide import QtCore, QtGui
 from quantiphyse.gui.widgets import QpWidget, HelpButton, BatchButton, OverlayCombo, NumericOption, NumberList, LoadNumbers, OrderList, OrderListButtons, Citation, TitleWidget, RunBox
 from quantiphyse.gui.dialogs import TextViewerDialog, error_dialog, GridEditDialog
 from quantiphyse.analysis import Process
-from quantiphyse.utils import debug, warn
+from quantiphyse.utils import debug, warn, get_plugins
 from quantiphyse.utils.exceptions import QpException
 from quantiphyse.volumes.io import save
 
@@ -46,14 +46,10 @@ class FabberWidget(QpWidget):
             return match.group(1).upper()
         else:
             return lib
-    
+
     def init_ui(self):
         mainGrid = QtGui.QVBoxLayout()
         self.setLayout(mainGrid)
-
-        if not FabberProcess.FABBER_FOUND:
-            mainGrid.addWidget(QtGui.QLabel("Fabber core library not found.\n\n You must install Fabber to use this widget"))
-            return
 
         self.rundata = {}
         self.rundata["model"] = "poly"
@@ -78,14 +74,13 @@ class FabberWidget(QpWidget):
 
         grid.addWidget(QtGui.QLabel("Model group"), 0, 0)
         self.modellibCombo = QtGui.QComboBox(self)
-        self.modellibCombo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
         self.modellibCombo.addItem("GENERIC", "")
-        for lib in FabberProcess.MODEL_LIBS:
+        for lib in get_plugins(key="fabber-libs"):
             self.modellibCombo.addItem(self.model_name(lib), lib)
         self.modellibCombo.currentIndexChanged.connect(self.model_group_changed)
         self.modellibCombo.setCurrentIndex(0)
-
         grid.addWidget(self.modellibCombo, 0, 1)
+        
         grid.addWidget(QtGui.QLabel("Model"), 1, 0)
         self.modelCombo = QtGui.QComboBox(self)
         self.modelCombo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)

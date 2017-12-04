@@ -40,7 +40,7 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
             data[add_data[n]] = add_data[n+1]
             n += 2
             
-        lib = FabberLib(rundata=rundata, auto_load_models=True)
+        lib = FabberLib(rundata=rundata, auto_load_models=False)
         run = lib.run_with_data(rundata, data, roi, progress_cb=_make_fabber_progress_cb(id, queue))
         
         return id, True, run
@@ -54,16 +54,6 @@ class FabberProcess(BackgroundProcess):
     """
 
     PROCESS_NAME = "Fabber"
-    FABBER_FOUND = False
-    FABBER_EX = None
-    FABBER_LIB = None
-    
-    try:
-        FABBER_EX, FABBER_LIB, MODEL_LIBS = find_fabber()
-        FABBER_FOUND = FABBER_LIB is not None
-    except:
-        # Error with fabber logged on import
-        pass
 
     def __init__(self, ivm, **kwargs):
         BackgroundProcess.__init__(self, ivm, _run_fabber, **kwargs)

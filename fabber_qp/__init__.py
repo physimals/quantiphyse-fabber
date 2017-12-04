@@ -10,5 +10,7 @@ os.environ["FSLDIR"] = os.path.abspath(os.path.dirname(__file__))
 from .process import FabberProcess
 from .widget import FabberWidget
 
-QP_WIDGETS = [FabberWidget]
-QP_PROCESSES = [FabberProcess]
+QP_MANIFEST = {
+    "widgets" : [FabberWidget],
+    "processes" : [FabberProcess]
+}
