@@ -229,7 +229,7 @@ class FabberWidget(QpWidget):
         return process
 
     def get_rundata(self):
-        return self.rundata
+        return dict(self.rundata)
 
     def save_file(self):
         self.rundata.save()
@@ -253,7 +253,7 @@ class FabberWidget(QpWidget):
             self.reset()
 
     def batch_options(self):
-        return "Fabber", self.rundata
+        return "Fabber", dict(self.rundata)
 
 QP_WIDGETS = [FabberWidget]
 QP_PROCESSES = [FabberProcess]

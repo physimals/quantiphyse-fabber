@@ -134,7 +134,10 @@ class IntegerOptionWidget(OptionWidget):
         
     def set_value(self, val):
         if val == "":
-            self.sb.setValue(int(self.default))
+            try:
+                self.sb.setValue(int(self.default))
+            except:
+                self.sb.setValue(0)
         else:
             self.sb.setValue(int(val))
 
