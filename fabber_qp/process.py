@@ -65,7 +65,19 @@ class FabberProcess(BackgroundProcess):
                 raise QpException("No data loaded")
             data = self.ivm.main.std()
         else:
-            data = self.ivm.data[data_name].std()
+            if isinstance(data_name, list):
+                # Allow specifying a list of data volumes which are concatenated
+                multi_data = [self.ivm.data[name] for name in data_name]
+                nvols = sum([d.nvols for d in multi_data])
+                debug("Fabber multivol: nvols=", nvols)
+                data = np.zeros(self.ivm.grid.shape + [nvols,]) # FIXME what if no main data
+                v = 0
+                for d in multi_data:
+                    debug("Fabber multivol - adding %s, %i vols" % (d.name, d.nvols))
+                    data[:,:,:,v:v+d.nvols] = np.expand_dims(d.std(), 3)
+                    v += d.nvols
+            else:
+                data = self.ivm.data[data_name].std()
 
         roi_name = options.pop("roi", None)
         if roi_name is None:
