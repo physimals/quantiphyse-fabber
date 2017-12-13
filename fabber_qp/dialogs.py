@@ -77,7 +77,7 @@ class OptionsDialog(GenericOptionsDialog):
         nonreq = [opt for opt in self.opts if opt["optional"]]
         
         if req:
-            label = get_label("Mandatory options", size=12, bold=True)
+            label = get_label("Mandatory options", size=14, bold=True)
             self.grid.addWidget(label, 0, 0)
             self._add_opts(req, 1)
         if nonreq:

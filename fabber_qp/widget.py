@@ -9,7 +9,6 @@ import sys
 import os
 import time
 import traceback
-import re
 import tempfile
 
 import nibabel as nib
@@ -39,13 +38,9 @@ class FabberWidget(QpWidget):
     def __init__(self, **kwargs):
         QpWidget.__init__(self, name="Fabber", icon="fabber", group="Fabber",
                           desc="Fabber Bayesian model fitting", **kwargs)
-    
-    def model_name(self, lib):
-        match = re.match(".*fabber_models_(.+)\..+", lib, re.I)
-        if match:
-            return match.group(1).upper()
-        else:
-            return lib
+
+    def fab(self):
+        return FabberProcess.api(self.rundata)
 
     def init_ui(self):
         mainGrid = QtGui.QVBoxLayout()
@@ -76,7 +71,7 @@ class FabberWidget(QpWidget):
         self.modellibCombo = QtGui.QComboBox(self)
         self.modellibCombo.addItem("GENERIC", "")
         for lib in get_plugins(key="fabber-libs"):
-            self.modellibCombo.addItem(self.model_name(lib), lib)
+            self.modellibCombo.addItem(FabberProcess.get_model_group_name(lib).upper())
         self.modellibCombo.currentIndexChanged.connect(self.model_group_changed)
         self.modellibCombo.setCurrentIndex(0)
         grid.addWidget(self.modellibCombo, 0, 1)
@@ -150,33 +145,26 @@ class FabberWidget(QpWidget):
         self.model_group_changed()
         self.method_changed()
 
-    def fab(self):
-        from .fabber_api import FabberLib
-        return FabberLib(rundata=self.rundata, auto_load_models=False)
-
     def model_group_changed(self):
         idx = self.modellibCombo.currentIndex()
         if idx >= 0:
-            lib = self.modellibCombo.itemData(idx)
-            if lib != "":
-                self.rundata["loadmodels"] = lib
-            elif "loadmodels" in self.rundata:
-                del self.rundata["loadmodels"]
-            self.modellibCombo.setToolTip(lib)
+            self.rundata["model-group"] = self.modellibCombo.currentText()
+        else:
+            self.rundata.pop("model-group", None)
 
-            # Update the list of models
-            models = self.fab().get_models()
-            self.modelCombo.blockSignals(True)
-            try:
-                self.modelCombo.clear()
-                for model in models:
-                    self.modelCombo.addItem(model)
-            finally:
-                self.modelCombo.blockSignals(False)
-                if self.rundata.get("model", "") in models:
-                    self.modelCombo.setCurrentIndex(self.modelCombo.findText(self.rundata["model"]))
-                else:
-                    self.modelCombo.setCurrentIndex(0)
+        # Update the list of models
+        models = self.fab().get_models()
+        self.modelCombo.blockSignals(True)
+        try:
+            self.modelCombo.clear()
+            for model in models:
+                self.modelCombo.addItem(model)
+        finally:
+            self.modelCombo.blockSignals(False)
+            if self.rundata.get("model", "") in models:
+                self.modelCombo.setCurrentIndex(self.modelCombo.findText(self.rundata["model"]))
+            else:
+                self.modelCombo.setCurrentIndex(0)
       
     def model_changed(self):
         model = self.modelCombo.currentText()
@@ -229,6 +217,7 @@ class FabberWidget(QpWidget):
         return process
 
     def get_rundata(self):
+        # Must return a copy as process may modify
         return dict(self.rundata)
 
     def save_file(self):
@@ -253,7 +242,7 @@ class FabberWidget(QpWidget):
             self.reset()
 
     def batch_options(self):
-        return "Fabber", dict(self.rundata)
+        return "Fabber", self.get_rundata()
 
 QP_WIDGETS = [FabberWidget]
 QP_PROCESSES = [FabberProcess]

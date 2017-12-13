@@ -2,15 +2,16 @@ import sys
 import os
 import warnings
 import traceback
+import re
 
 import numpy as np
 
 from quantiphyse.analysis import Process, BackgroundProcess
-from quantiphyse.utils import debug, warn
+from quantiphyse.utils import debug, warn, get_plugins, get_local_shlib
 from quantiphyse.utils.exceptions import QpException
 
 # The Fabber API is bundled with the plugin under a different name
-from .fabber_api import find_fabber, FabberLib, FabberRunData, LibRun
+from .fabber_api import find_fabber, Fabber, FabberRun
 
 def _make_fabber_progress_cb(id, queue):
     """ 
@@ -30,7 +31,7 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
         if np.count_nonzero(roi) == 0:
             # Ignore runs with no voxel. Return placeholder object
             debug("No voxels")
-            return id, True, LibRun({}, "")
+            return id, True, FabberRun({}, "")
     
         data = {"data" : main_data}
         n = 0
@@ -40,17 +41,19 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
             data[add_data[n]] = add_data[n+1]
             n += 2
             
-        lib = FabberLib(rundata=rundata, auto_load_models=False)
-        run = lib.run_with_data(rundata, data, roi, progress_cb=_make_fabber_progress_cb(id, queue))
+        api = Fabber(lib=FabberProcess.get_core_lib(), rundata=rundata, auto_load_models=False)
+        run = api.run_with_data(rundata, data, roi, progress_cb=_make_fabber_progress_cb(id, queue))
         
         return id, True, run
     except:
-        #print(sys.exc_info()[1])
         return id, False, sys.exc_info()[1]
 
 class FabberProcess(BackgroundProcess):
     """
     Asynchronous background process to run Fabber
+
+    Note the static methods - these are so they can be called by other plugins which
+    can obtain a reference to the FabberProcess class only 
     """
 
     PROCESS_NAME = "Fabber"
@@ -58,38 +61,40 @@ class FabberProcess(BackgroundProcess):
     def __init__(self, ivm, **kwargs):
         BackgroundProcess.__init__(self, ivm, _run_fabber, **kwargs)
 
-    def run(self, options):
-        data_name = options.pop("data", None)
-        if data_name is None:
-            if self.ivm.main is None:
-                raise QpException("No data loaded")
-            data = self.ivm.main.std()
+    @staticmethod
+    def get_core_lib():
+        """ Get path to core shared library """
+        return get_local_shlib("fabbercore_shared", __file__)
+    
+    @staticmethod
+    def get_model_group_name(lib):
+        """ Get the model group name from a library name"""
+        match = re.match(".*fabber_models_(.+)\..+", lib, re.I)
+        if match:
+            return match.group(1)
         else:
-            if isinstance(data_name, list):
-                # Allow specifying a list of data volumes which are concatenated
-                multi_data = [self.ivm.data[name] for name in data_name]
-                nvols = sum([d.nvols for d in multi_data])
-                debug("Fabber multivol: nvols=", nvols)
-                data = np.zeros(self.ivm.grid.shape + [nvols,]) # FIXME what if no main data
-                v = 0
-                for d in multi_data:
-                    debug("Fabber multivol - adding %s, %i vols" % (d.name, d.nvols))
-                    data[:,:,:,v:v+d.nvols] = np.expand_dims(d.std(), 3)
-                    v += d.nvols
-            else:
-                data = self.ivm.data[data_name].std()
+            return lib
 
-        roi_name = options.pop("roi", None)
-        if roi_name is None:
-            if self.ivm.current_roi is not None:
-                roidata = self.ivm.current_roi.std()
-            else:
-                roidata = np.ones(data.shape[:3])
-        else:
-            roidata = self.ivm.rois[roi_name].std()
+    @staticmethod
+    def get_model_group_lib(name):
+        """ Get the model group library path from the model group name"""
+        for lib in get_plugins(key="fabber-libs"):
+            libname = os.path.basename(lib)
+            if FabberProcess.get_model_group_name(libname) == name:
+                return lib
+        return None
 
-        self.output_rename = options.pop("output-rename", {})
-
+    @staticmethod
+    def api(options={}):
+        options = dict(options) # Don't modify
+        return Fabber(lib=FabberProcess.get_core_lib(), rundata=FabberProcess.get_rundata(options), auto_load_models=False)
+    
+    @staticmethod
+    def get_rundata(options={}):
+        """ 
+        Get rundata which is nearly a copy of options with a few changes 
+        Note default argument is safe because never modified if empty
+        """
         # FIXME rundata requires all arguments to be strings!
         rundata = {}
         for key in options.keys():
@@ -101,20 +106,30 @@ class FabberProcess(BackgroundProcess):
         if "model" not in rundata: 
             rundata["model"] = "poly"
             rundata["degree"] = 2
-        if "method" not in rundata: rundata["method"] = "vb"
-        if "noise" not in rundata: rundata["noise"] = "white"
+        rundata["method"] = rundata.get("method", "vb")
+        rundata["noise"] = rundata.get("noise", "white")
+
+        # Look up the actual library which provides a model group
+        lib = FabberProcess.get_model_group_lib(rundata.get("model-group", ""))
+        if lib is not None:
+            rundata["loadmodels"] = lib
+        return rundata
+
+    def run(self, options):
+        data = self.get_data(options)
+        roidata = self.get_roi(options)
+        
+        self.output_rename = options.pop("output-rename", {})
+        rundata = self.get_rundata(options)
+
+        # This is not perfect - we just grab all data matching an option value
+        # FIXME where has this gone?
 
         # Pass in input data. To enable the multiprocessing module to split our volumes
         # up automatically we have to pass the arguments as a single list. This consists of
         # rundata, main data, roi and then each of the used additional data items, name followed by data
         input_args = [rundata, data, roidata]
-
-        # This is not perfect - we just grab all data matching an option value
-        for key, value in rundata.items():
-            if value in self.ivm.data:
-                input_args.append(value)
-                input_args.append(self.ivm.data[value].std())
-
+        
         if rundata["method"] == "spatialvb":
             # Spatial VB will not work properly in parallel
             n = 1
