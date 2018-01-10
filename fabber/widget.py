@@ -112,8 +112,8 @@ class FabberWidget(QpWidget):
         mainGrid.addWidget(optionsBox)
 
         # Run box
-        runBox = RunBox(self.get_process, self.get_rundata, title="Run Fabber", save_option=True)
-        mainGrid.addWidget(runBox)
+        self.runBox = RunBox(self.get_process, self.get_rundata, title="Run Fabber", save_option=True)
+        mainGrid.addWidget(self.runBox)
 
         # Load/save box
         fileBox = QtGui.QGroupBox()
