@@ -15,14 +15,14 @@ desc = "Quantiphyse package for Fabber"
 version = "0.0.1"
 
 # setup parameters
-setup(name='fabber_qp',
+setup(name='qp-fabber',
       cmdclass={},
       version=version,
       description=desc,
       long_description=desc,
       author='Michael Chappell, Martin Craig',
       author_email='martin.craig@eng.ox.ac.uk',
-      packages=['fabber_qp'],
+      packages=['fabber'],
       include_package_data=True,
       data_files=[],
       setup_requires=[],
