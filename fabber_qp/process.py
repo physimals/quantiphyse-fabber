@@ -116,7 +116,7 @@ class FabberProcess(BackgroundProcess):
         return rundata
 
     def run(self, options):
-        data = self.get_data(options)
+        data = self.get_data(options, multi=True)
         roidata = self.get_roi(options)
         
         self.output_rename = options.pop("output-rename", {})
