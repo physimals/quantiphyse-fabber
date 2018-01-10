@@ -122,13 +122,16 @@ class FabberProcess(BackgroundProcess):
         self.output_rename = options.pop("output-rename", {})
         rundata = self.get_rundata(options)
 
-        # This is not perfect - we just grab all data matching an option value
-        # FIXME where has this gone?
-
         # Pass in input data. To enable the multiprocessing module to split our volumes
         # up automatically we have to pass the arguments as a single list. This consists of
         # rundata, main data, roi and then each of the used additional data items, name followed by data
         input_args = [rundata, data, roidata]
+
+        # This is not perfect - we just grab all data matching an option value
+        for key, value in rundata.items():
+            if value in self.ivm.data:
+                input_args.append(value)
+                input_args.append(self.ivm.data[value].std())
         
         if rundata["method"] == "spatialvb":
             # Spatial VB will not work properly in parallel
