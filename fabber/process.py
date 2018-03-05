@@ -71,16 +71,16 @@ class FabberProcess(BackgroundProcess):
         """ Get the model group name from a library name"""
         match = re.match(".*fabber_models_(.+)\..+", lib, re.I)
         if match:
-            return match.group(1)
+            return match.group(1).lower()
         else:
-            return lib
+            return lib.lower()
 
     @staticmethod
     def get_model_group_lib(name):
         """ Get the model group library path from the model group name"""
         for lib in get_plugins(key="fabber-libs"):
             libname = os.path.basename(lib)
-            if FabberProcess.get_model_group_name(libname) == name:
+            if FabberProcess.get_model_group_name(libname) == name.lower():
                 return lib
         return None
 
