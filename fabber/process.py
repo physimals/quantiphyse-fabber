@@ -6,9 +6,8 @@ import re
 
 import numpy as np
 
-from quantiphyse.analysis import Process, BackgroundProcess
-from quantiphyse.utils import debug, warn, get_plugins, get_local_shlib
-from quantiphyse.utils.exceptions import QpException
+from quantiphyse.processes import Process, BackgroundProcess
+from quantiphyse.utils import debug, warn, get_plugins, get_local_shlib, QpException
 
 # The Fabber API is bundled with the plugin under a different name
 from .fabber_api import find_fabber, Fabber, FabberRun
@@ -60,7 +59,8 @@ class FabberProcess(BackgroundProcess):
 
     def __init__(self, ivm, **kwargs):
         BackgroundProcess.__init__(self, ivm, _run_fabber, **kwargs)
-
+        self.grid = None
+        
     @staticmethod
     def get_core_lib():
         """ Get path to core shared library """
@@ -117,7 +117,8 @@ class FabberProcess(BackgroundProcess):
 
     def run(self, options):
         data = self.get_data(options, multi=True)
-        roidata = self.get_roi(options)
+        self.grid = data.grid
+        roi = self.get_roi(options, self.grid)
         
         self.output_rename = options.pop("output-rename", {})
         rundata = self.get_rundata(options)
@@ -125,24 +126,22 @@ class FabberProcess(BackgroundProcess):
         # Pass in input data. To enable the multiprocessing module to split our volumes
         # up automatically we have to pass the arguments as a single list. This consists of
         # rundata, main data, roi and then each of the used additional data items, name followed by data
-        input_args = [rundata, data, roidata]
+        input_args = [rundata, data.raw(), roi.raw()]
 
         # This is not perfect - we just grab all data matching an option value
         for key, value in rundata.items():
             if value in self.ivm.data:
                 input_args.append(value)
-                input_args.append(self.ivm.data[value].std())
+                input_args.append(self.ivm.data[value].resample(data.grid).raw())
         
         if rundata["method"] == "spatialvb":
             # Spatial VB will not work properly in parallel
             n = 1
         else:
             # Run one worker for each slice
-            n = data.shape[0]
+            n = self.grid.shape[0]
 
-        if roidata is not None: self.voxels_todo = np.count_nonzero(roidata)
-        else: self.voxels_todo = self.ivm.main.grid.nvoxels
-
+        self.voxels_todo = np.count_nonzero(roi.raw())
         self.voxels_done = [0, ] * n
         self.start(n, input_args)
 
@@ -173,6 +172,6 @@ class FabberProcess(BackgroundProcess):
                 recombined_item = self.recombine_data([o.data.get(key, None) for o in self.output])
                 debug("recombined")
                 name = self.output_rename.get(key, key)
-                self.ivm.add_data(recombined_item, name=name, make_current=first)
+                self.ivm.add_data(recombined_item, grid=self.grid, name=name, make_current=first)
                 first = False
 
