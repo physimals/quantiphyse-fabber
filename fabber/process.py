@@ -60,6 +60,7 @@ class FabberProcess(BackgroundProcess):
     def __init__(self, ivm, **kwargs):
         BackgroundProcess.__init__(self, ivm, _run_fabber, **kwargs)
         self.grid = None
+        self.data_items = []
         
     @staticmethod
     def get_core_lib():
@@ -165,6 +166,7 @@ class FabberProcess(BackgroundProcess):
         if self.status == Process.SUCCEEDED:
             first = True
             data_keys = []
+            self.data_items = []
             for o in self.output:
                 if len(o.data) > 0: data_keys = o.data.keys()
             for key in data_keys:
@@ -172,6 +174,9 @@ class FabberProcess(BackgroundProcess):
                 recombined_item = self.recombine_data([o.data.get(key, None) for o in self.output])
                 debug("recombined")
                 name = self.output_rename.get(key, key)
+                self.data_items.append(name)
                 self.ivm.add_data(recombined_item, grid=self.grid, name=name, make_current=first)
                 first = False
 
+    def output_data_items(self):
+        return self.data_items
