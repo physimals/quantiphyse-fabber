@@ -6,7 +6,7 @@ import re
 
 import numpy as np
 
-from quantiphyse.processes import Process, BackgroundProcess
+from quantiphyse.processes import Process, ParallelProcess
 from quantiphyse.utils import debug, warn, get_plugins, get_local_shlib, QpException
 
 # The Fabber API is bundled with the plugin under a different name
@@ -47,7 +47,7 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
     except:
         return id, False, sys.exc_info()[1]
 
-class FabberProcess(BackgroundProcess):
+class FabberProcess(ParallelProcess):
     """
     Asynchronous background process to run Fabber
 
@@ -58,7 +58,7 @@ class FabberProcess(BackgroundProcess):
     PROCESS_NAME = "Fabber"
 
     def __init__(self, ivm, **kwargs):
-        BackgroundProcess.__init__(self, ivm, _run_fabber, **kwargs)
+        ParallelProcess.__init__(self, ivm, _run_fabber, **kwargs)
         self.grid = None
         self.data_items = []
         
@@ -144,7 +144,7 @@ class FabberProcess(BackgroundProcess):
 
         self.voxels_todo = np.count_nonzero(roi.raw())
         self.voxels_done = [0, ] * n
-        self.start(n, input_args)
+        self.start_parallel(input_args, n)
 
     def timeout(self):
         if self.queue.empty(): return
