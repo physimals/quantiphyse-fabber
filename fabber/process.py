@@ -27,7 +27,9 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
     Function to run Fabber in a multiprocessing environment
     """
     try:
-        os.chdir(rundata.pop("indir"))
+        indir = rundata.pop("indir")
+        if indir:
+            os.chrid(indir)
 
         if np.count_nonzero(roi) == 0:
             # Ignore runs with no voxel. Return placeholder object
