@@ -27,6 +27,8 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
     Function to run Fabber in a multiprocessing environment
     """
     try:
+        os.chdir(rundata.pop("indir"))
+
         if np.count_nonzero(roi) == 0:
             # Ignore runs with no voxel. Return placeholder object
             debug("No voxels")
@@ -109,11 +111,12 @@ class FabberProcess(ParallelProcess):
             rundata["degree"] = 2
         rundata["method"] = rundata.get("method", "vb")
         rundata["noise"] = rundata.get("noise", "white")
-
+    
         # Look up the actual library which provides a model group
-        lib = FabberProcess.get_model_group_lib(rundata.get("model-group", ""))
+        lib = FabberProcess.get_model_group_lib(rundata.pop("model-group", ""))
         if lib is not None:
             rundata["loadmodels"] = lib
+
         return rundata
 
     def run(self, options):
@@ -123,6 +126,9 @@ class FabberProcess(ParallelProcess):
         
         self.output_rename = options.pop("output-rename", {})
         rundata = self.get_rundata(options)
+
+        # Pass our input directory
+        rundata["indir"] = self.indir
 
         # Pass in input data. To enable the multiprocessing module to split our volumes
         # up automatically we have to pass the arguments as a single list. This consists of
@@ -147,6 +153,9 @@ class FabberProcess(ParallelProcess):
         self.start_parallel(input_args, n)
 
     def timeout(self):
+        """
+        Check the queue and emit sig_progress
+        """
         if self.queue.empty(): return
         while not self.queue.empty():
             id, v, nv = self.queue.get()
@@ -157,13 +166,17 @@ class FabberProcess(ParallelProcess):
         self.sig_progress.emit(complete)
 
     def finished(self):
-        """ Add output data to the IVM and set the combined log """
+        """ 
+        Add output data to the IVM and set the log 
+        """
         self.log = ""
-        for o in self.output:
-            if o is not None and  hasattr(o, "log") and len(o.log) > 0:
-                self.log += o.log + "\n\n"
-
+        
         if self.status == Process.SUCCEEDED:
+            # Only include log from first process to avoid multiple repetitions
+            for o in self.output:
+                if o is not None and  hasattr(o, "log") and len(o.log) > 0:
+                    self.log = o.log
+                    break
             first = True
             data_keys = []
             self.data_items = []
@@ -177,6 +190,12 @@ class FabberProcess(ParallelProcess):
                 self.data_items.append(name)
                 self.ivm.add_data(recombined_item, grid=self.grid, name=name, make_current=first)
                 first = False
+        else:
+            # Include the log of the first failed process
+            for o in self.output:
+                if o is not None and isinstance(o, Exception) and hasattr(o, "log") and len(o.log) > 0:
+                    self.log = o.log
+                    break
 
     def output_data_items(self):
         return self.data_items
