@@ -6,7 +6,7 @@ import re
 
 import numpy as np
 
-from quantiphyse.processes import Process, ParallelProcess
+from quantiphyse.processes import Process
 from quantiphyse.utils import debug, warn, get_plugins, get_local_shlib, QpException
 
 # The Fabber API is bundled with the plugin under a different name
@@ -51,7 +51,7 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
     except:
         return id, False, sys.exc_info()[1]
 
-class FabberProcess(ParallelProcess):
+class FabberProcess(Process):
     """
     Asynchronous background process to run Fabber
 
@@ -62,7 +62,7 @@ class FabberProcess(ParallelProcess):
     PROCESS_NAME = "Fabber"
 
     def __init__(self, ivm, **kwargs):
-        ParallelProcess.__init__(self, ivm, _run_fabber, **kwargs)
+        Process.__init__(self, ivm, worker_fn=_run_fabber, **kwargs)
         self.grid = None
         self.data_items = []
         
@@ -152,7 +152,7 @@ class FabberProcess(ParallelProcess):
 
         self.voxels_todo = np.count_nonzero(roi.raw())
         self.voxels_done = [0, ] * n
-        self.start_parallel(input_args, n)
+        self.start_bg(input_args, n_workers=n)
 
     def timeout(self):
         """
@@ -175,18 +175,18 @@ class FabberProcess(ParallelProcess):
         
         if self.status == Process.SUCCEEDED:
             # Only include log from first process to avoid multiple repetitions
-            for o in self.output:
+            for o in self.worker_output:
                 if o is not None and  hasattr(o, "log") and len(o.log) > 0:
                     self.log = o.log
                     break
             first = True
             data_keys = []
             self.data_items = []
-            for o in self.output:
+            for o in self.worker_output:
                 if len(o.data) > 0: data_keys = o.data.keys()
             for key in data_keys:
                 debug(key)
-                recombined_item = self.recombine_data([o.data.get(key, None) for o in self.output])
+                recombined_item = self.recombine_data([o.data.get(key, None) for o in self.worker_output])
                 debug("recombined")
                 name = self.output_rename.get(key, key)
                 self.data_items.append(name)
@@ -194,7 +194,7 @@ class FabberProcess(ParallelProcess):
                 first = False
         else:
             # Include the log of the first failed process
-            for o in self.output:
+            for o in self.worker_output:
                 if o is not None and isinstance(o, Exception) and hasattr(o, "log") and len(o.log) > 0:
                     self.log = o.log
                     break
