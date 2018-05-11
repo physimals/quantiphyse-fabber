@@ -1,7 +1,5 @@
 import sys
 import os
-import warnings
-import traceback
 import re
 
 import numpy as np
@@ -10,7 +8,7 @@ from quantiphyse.processes import Process
 from quantiphyse.utils import debug, warn, get_plugins, get_local_shlib, QpException
 
 # The Fabber API is bundled with the plugin under a different name
-from .fabber_api import find_fabber, Fabber, FabberRun
+from .fabber_api import Fabber, FabberRun
 
 def _make_fabber_progress_cb(id, queue):
     """ 
@@ -100,11 +98,10 @@ class FabberProcess(Process):
         Get rundata which is nearly a copy of options with a few changes 
         Note default argument is safe because never modified if empty
         """
-        # FIXME rundata requires all arguments to be strings!
         rundata = {}
         for key in options.keys():
             value = options.pop(key)
-            if value is not None: rundata[key] = str(value)
+            if value is not None: rundata[key] = value
             else: rundata[key] = ""
 
         # Make sure we have minimal defaults to run
@@ -132,25 +129,31 @@ class FabberProcess(Process):
         # Pass our input directory
         rundata["indir"] = self.indir
 
+        # Use smallest sub-array of the data which contains all unmasked voxels
+        self.bb_slices = roi.get_bounding_box()
+        data_bb = data.raw()[self.bb_slices]
+        mask_bb = roi.raw()[self.bb_slices]
+
         # Pass in input data. To enable the multiprocessing module to split our volumes
         # up automatically we have to pass the arguments as a single list. This consists of
         # rundata, main data, roi and then each of the used additional data items, name followed by data
-        input_args = [rundata, data.raw(), roi.raw()]
+        input_args = [rundata, data_bb, mask_bb]
 
         # This is not perfect - we just grab all data matching an option value
         for key, value in rundata.items():
             if value in self.ivm.data:
                 input_args.append(value)
-                input_args.append(self.ivm.data[value].resample(data.grid).raw())
+                ovl_bb = self.ivm.data[value].resample(data.grid).raw()[self.bb_slices]
+                input_args.append(ovl_bb)
         
         if rundata["method"] == "spatialvb":
             # Spatial VB will not work properly in parallel
             n = 1
         else:
             # Run one worker for each slice
-            n = self.grid.shape[0]
+            n = data_bb.shape[0]
 
-        self.voxels_todo = np.count_nonzero(roi.raw())
+        self.voxels_todo = np.count_nonzero(mask_bb)
         self.voxels_done = [0, ] * n
         self.start_bg(input_args, n_workers=n)
 
@@ -161,7 +164,10 @@ class FabberProcess(Process):
         if self.queue.empty(): return
         while not self.queue.empty():
             id, v, nv = self.queue.get()
-            self.voxels_done[id] = v
+            if id < len(self.voxels_done):
+                self.voxels_done[id] = v
+            else:
+                warn("Fabber: Id=%i in timeout (max %i)" % (id, len(self.voxels_done)))
         cv = sum(self.voxels_done)
         if self.voxels_todo > 0: complete = float(cv)/self.voxels_todo
         else: complete = 1
@@ -186,12 +192,17 @@ class FabberProcess(Process):
                 if len(o.data) > 0: data_keys = o.data.keys()
             for key in data_keys:
                 debug(key)
-                recombined_item = self.recombine_data([o.data.get(key, None) for o in self.worker_output])
-                debug("recombined")
+                recombined_data = self.recombine_data([o.data.get(key, None) for o in self.worker_output])
                 name = self.output_rename.get(key, key)
-                self.data_items.append(name)
-                self.ivm.add_data(recombined_item, grid=self.grid, name=name, make_current=first)
-                first = False
+                if key is not None:
+                    self.data_items.append(name)
+                    if recombined_data.ndim == 4:
+                        full_data = np.zeros(list(self.grid.shape) + [recombined_data.shape[3],])
+                    else:
+                        full_data = np.zeros(self.grid.shape)
+                    full_data[self.bb_slices] = recombined_data
+                    self.ivm.add_data(full_data, grid=self.grid, name=name, make_current=first)
+                    first = False
         else:
             # Include the log of the first failed process
             for o in self.worker_output:
