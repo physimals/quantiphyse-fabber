@@ -160,6 +160,7 @@ class PriorsDialog(OptionsDialog):
         image = self.rundata.get("PSP_byname%i_image" % prior_idx, "")
         mean = self.rundata.get("PSP_byname%i_mean" % prior_idx, "")
         prec = self.rundata.get("PSP_byname%i_prec" % prior_idx, "")
+        trans = self.rundata.get("PSP_byname%i_transform" % prior_idx, "")
 
         type_combo = QtGui.QComboBox()
         type_combo.addItem("Normal", "N")
@@ -193,6 +194,16 @@ class PriorsDialog(OptionsDialog):
         prec_edit = QtGui.QLineEdit(prec)
         prec_edit.editingFinished.connect(self._changed)
         
+        trans_combo = QtGui.QComboBox()
+        trans_combo.addItem("Default transformation", "")
+        trans_combo.addItem("No transformation", "I")
+        trans_combo.addItem("Log transformation", "L")
+        trans_combo.addItem("Soft-plus transformation", "S")
+        trans_combo.addItem("Fractional transformation", "F")
+        trans_combo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
+        trans_combo.setCurrentIndex(trans_combo.findData(trans))
+        trans_combo.currentIndexChanged.connect(self._changed)
+
         return (type_combo, 
                QtGui.QLabel("Image: "), 
                image_combo, 
@@ -201,7 +212,8 @@ class PriorsDialog(OptionsDialog):
                mean_edit,
                prec_cb, 
                QtGui.QLabel("Custom precision: "), 
-               prec_edit)
+               prec_edit,
+               trans_combo)
 
     def _update_widgets(self):
          for idx, param in enumerate(self.params):
@@ -237,7 +249,7 @@ class PriorsDialog(OptionsDialog):
             prior_type = w[0].itemData(w[0].currentIndex())
             
             # Do we need to set any options for this prior?
-            if prior_type != "N" or w[3].isChecked() or w[6].isChecked():
+            if prior_type != "N" or w[3].isChecked() or w[6].isChecked() or w[9].currentIndex() > 0:
                 self.rundata["PSP_byname%i" % prior_idx] = param
                 self.rundata["PSP_byname%i_type" % prior_idx] = prior_type
                 if prior_type == "I":
@@ -252,6 +264,8 @@ class PriorsDialog(OptionsDialog):
                     self.rundata["PSP_byname%i_prec" % prior_idx] = w[8].text()
                 else:
                     _del(self.rundata, "PSP_byname%i_prec" % prior_idx)
+                if w[9].currentIndex() > 0:
+                    self.rundata["PSP_byname%i_transform" % prior_idx] = w[9].itemData(w[9].currentIndex())
                 prior_idx += 1
 
         # Get rid of any subsequent PSP options that were previously set
@@ -260,6 +274,7 @@ class PriorsDialog(OptionsDialog):
             _del(self.rundata, "PSP_byname%i_type" % prior_idx)
             _del(self.rundata, "PSP_byname%i_image" % prior_idx)
             _del(self.rundata, "PSP_byname%i_prec" % prior_idx)
+            _del(self.rundata, "PSP_byname%i_transform" % prior_idx)
             prior_idx += 1
         
     def _repopulate(self):
