@@ -8,5 +8,5 @@ from .process import FabberProcess
 
 QP_MANIFEST = {
     "processes" : [FabberProcess],
-    "fabber-libs" : [get_local_shlib("fabber_models_asl", __file__), get_local_shlib("fabber_models_t1", __file__)],
+    "fabber-libs" : [get_local_shlib("fabber_models_t1", __file__)],
 }
