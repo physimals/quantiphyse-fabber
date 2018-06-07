@@ -185,6 +185,8 @@ class FabberWidget(QpWidget):
         method = self.rundata["method"]
         dlg = OptionsDialog(self, ivm=self.ivm, rundata=self.rundata, desc_first=True)
         opts, desc = self.fab().get_options(method=method)
+        # Ignore prior options which have their own dialog
+        opts = [o for o in opts if "PSP_byname" not in o["name"] and o[name] != "param-spatial-priors"]
         dlg.set_title("Inference method: %s" % method, desc)
         dlg.set_options(opts)
         dlg.fit_width()
