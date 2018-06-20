@@ -18,10 +18,8 @@ from PySide import QtCore, QtGui
 
 from quantiphyse.gui.widgets import QpWidget, HelpButton, BatchButton, OverlayCombo, NumericOption, NumberList, LoadNumbers, OrderList, OrderListButtons, Citation, TitleWidget, RunBox
 from quantiphyse.gui.dialogs import TextViewerDialog, error_dialog, GridEditDialog
-from quantiphyse.analysis import Process
-from quantiphyse.utils import debug, warn, get_plugins
-from quantiphyse.utils.exceptions import QpException
-from quantiphyse.volumes.io import save
+from quantiphyse.utils import debug, warn, get_plugins, QpException
+from quantiphyse.data import save
 
 from .process import FabberProcess
 from .dialogs import OptionsDialog, PriorsDialog
@@ -112,8 +110,8 @@ class FabberWidget(QpWidget):
         mainGrid.addWidget(optionsBox)
 
         # Run box
-        runBox = RunBox(self.get_process, self.get_rundata, title="Run Fabber", save_option=True)
-        mainGrid.addWidget(runBox)
+        self.runBox = RunBox(self.get_process, self.get_rundata, title="Run Fabber", save_option=True)
+        mainGrid.addWidget(self.runBox)
 
         # Load/save box
         fileBox = QtGui.QGroupBox()
@@ -187,6 +185,8 @@ class FabberWidget(QpWidget):
         method = self.rundata["method"]
         dlg = OptionsDialog(self, ivm=self.ivm, rundata=self.rundata, desc_first=True)
         opts, desc = self.fab().get_options(method=method)
+        # Ignore prior options which have their own dialog
+        opts = [o for o in opts if "PSP_byname" not in o["name"] and o[name] != "param-spatial-priors"]
         dlg.set_title("Inference method: %s" % method, desc)
         dlg.set_options(opts)
         dlg.fit_width()
