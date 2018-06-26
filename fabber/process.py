@@ -1,14 +1,17 @@
 import sys
 import os
 import re
+import logging
 
 import numpy as np
 
 from quantiphyse.processes import Process
-from quantiphyse.utils import debug, warn, get_plugins, get_local_shlib, QpException
+from quantiphyse.utils import get_plugins, get_local_shlib, QpException
 
 # The Fabber API is bundled with the plugin under a different name
 from .fabber_api import Fabber, FabberRun
+
+LOG = logging.getLogger(__name__)
 
 def _make_fabber_progress_cb(id, queue):
     """ 
@@ -31,7 +34,7 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
 
         if np.count_nonzero(roi) == 0:
             # Ignore runs with no voxel. Return placeholder object
-            debug("No voxels")
+            LOG.debug("No voxels")
             return id, True, FabberRun({}, "")
     
         data = {"data" : main_data}
@@ -191,7 +194,7 @@ class FabberProcess(Process):
             for o in self.worker_output:
                 if len(o.data) > 0: data_keys = o.data.keys()
             for key in data_keys:
-                debug(key)
+                self.debug(key)
                 recombined_data = self.recombine_data([o.data.get(key, None) for o in self.worker_output])
                 name = self.output_rename.get(key, key)
                 if key is not None:

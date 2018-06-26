@@ -18,7 +18,7 @@ from PySide import QtCore, QtGui
 
 from quantiphyse.gui.widgets import QpWidget, HelpButton, BatchButton, OverlayCombo, NumericOption, NumberList, LoadNumbers, OrderList, OrderListButtons, Citation, TitleWidget, RunBox
 from quantiphyse.gui.dialogs import TextViewerDialog, error_dialog, GridEditDialog
-from quantiphyse.utils import debug, warn, get_plugins, QpException
+from quantiphyse.utils import get_plugins, QpException
 from quantiphyse.data import save
 
 from .process import FabberProcess

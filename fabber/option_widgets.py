@@ -1,12 +1,12 @@
-import os
+import logging
 import traceback
 
 from PySide import QtCore, QtGui
 
 from quantiphyse.gui.widgets import OverlayCombo
+from quantiphyse.utils import QpException
 
-from quantiphyse.utils import debug
-from quantiphyse.utils.exceptions import QpException
+LOG = logging.getLogger(__name__)
 
 def get_label(text="", size=None, bold=False, italic=False):
     label = QtGui.QLabel(text)
@@ -78,7 +78,7 @@ class OptionWidget(QtCore.QObject):
             self.rundata[self.key] = self.get_value()
         elif self.key in self.rundata:
             del self.rundata[self.key]
-        debug(self.rundata)
+        LOG.debug(self.rundata)
 
     def add_dependent(self, dep):
         if not self.enable_cb: return

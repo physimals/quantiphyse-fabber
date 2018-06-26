@@ -1,13 +1,13 @@
-import sys
+import logging
 
 from PySide import QtGui, QtCore
 
-from quantiphyse.utils import debug
 from quantiphyse.gui.widgets import OverlayCombo
 
 from .option_widgets import get_option_widget, get_label
 
 NUMBERED_OPTIONS_MAX=20
+LOG = logging.getLogger(__name__)
 
 def _del(rundata, key):
     if key in rundata: del rundata[key]
@@ -142,7 +142,7 @@ class PriorsDialog(OptionsDialog):
         self.params = []
         
     def set_params(self, params):
-        debug("Params=", params, self.params)
+        LOG.debug("Params=", params, self.params)
         self.params = params
         self._repopulate()
 
