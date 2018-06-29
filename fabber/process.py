@@ -1,34 +1,42 @@
+"""
+Quantiphyse: Process implementations for Fabber plugin
+
+Author: Martin Craig <martin.craig@eng.ox.ac.uk>
+Copyright (c) 2016-2017 University of Oxford, Martin Craig
+"""
+
 import sys
 import os
 import re
 import logging
 
+import six
 import numpy as np
 
 from quantiphyse.processes import Process
 from quantiphyse.utils import get_plugins, get_local_shlib, QpException
 
-# The Fabber API is bundled with the plugin under a different name
-from .fabber_api import Fabber, FabberRun
+# The Fabber API is bundled with the plugin
+from .fabber import Fabber, FabberRun
 
 LOG = logging.getLogger(__name__)
 
-def _make_fabber_progress_cb(id, queue):
+def _make_fabber_progress_cb(worker_id, queue):
     """ 
     Closure which can be used as a progress callback for the C API. Puts the 
     number of voxels processed onto the queue
     """
-    def progress_cb(voxel, nvoxels):
+    def _progress_cb(voxel, nvoxels):
         if (voxel % 100 == 0) or (voxel == nvoxels):
-            queue.put((id, voxel, nvoxels))
-    return progress_cb
+            queue.put((worker_id, voxel, nvoxels))
+    return _progress_cb
 
-def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
+def _run_fabber(worker_id, queue, options, main_data, roi, *add_data):
     """
     Function to run Fabber in a multiprocessing environment
     """
     try:
-        indir = rundata.pop("indir")
+        indir = options.pop("indir")
         if indir:
             os.chdir(indir)
 
@@ -37,20 +45,23 @@ def _run_fabber(id, queue, rundata, main_data, roi, *add_data):
             LOG.debug("No voxels")
             return id, True, FabberRun({}, "")
     
-        data = {"data" : main_data}
-        n = 0
+        options["data"] = main_data
+        options["mask"] = roi
         if len(add_data) % 2 != 0:
             raise Exception("Additional data has length %i - should be key then value" % len(add_data))
+        n = 0
         while n < len(add_data):
-            data[add_data[n]] = add_data[n+1]
+            options[add_data[n]] = add_data[n+1]
             n += 2
             
-        api = Fabber(lib=FabberProcess.get_core_lib(), rundata=rundata, auto_load_models=False)
-        run = api.run_with_data(rundata, data, roi, progress_cb=_make_fabber_progress_cb(id, queue))
+        api = FabberProcess.api(options)
+        run = api.run(options, progress_cb=_make_fabber_progress_cb(id, queue))
         
-        return id, True, run
+        return worker_id, True, run
     except:
-        return id, False, sys.exc_info()[1]
+        import traceback
+        traceback.print_exc()
+        return worker_id, False, sys.exc_info()[1]
 
 class FabberProcess(Process):
     """
@@ -75,7 +86,7 @@ class FabberProcess(Process):
     @staticmethod
     def get_model_group_name(lib):
         """ Get the model group name from a library name"""
-        match = re.match(".*fabber_models_(.+)\..+", lib, re.I)
+        match = re.match(r".*fabber_models_(.+)\..+", lib, re.I)
         if match:
             return match.group(1).lower()
         else:
@@ -91,16 +102,24 @@ class FabberProcess(Process):
         return None
 
     @staticmethod
-    def api(options={}):
+    def api(options=None):
+        """ Create a fabber API object """
+        if not options:
+            options = {}
         options = dict(options) # Don't modify
-        return Fabber(lib=FabberProcess.get_core_lib(), rundata=FabberProcess.get_rundata(options), auto_load_models=False)
+        model_libs = None
+        if "loadmodels" in options:
+            model_libs = [options.pop("loadmodels"),]
+        return Fabber(core_lib=FabberProcess.get_core_lib(), model_libs=model_libs)
     
     @staticmethod
-    def get_rundata(options={}):
+    def get_rundata(options=None):
         """ 
         Get rundata which is nearly a copy of options with a few changes 
         Note default argument is safe because never modified if empty
         """
+        if not options:
+            options = {}
         rundata = {}
         for key in options.keys():
             value = options.pop(key)
@@ -144,7 +163,7 @@ class FabberProcess(Process):
 
         # This is not perfect - we just grab all data matching an option value
         for key, value in rundata.items():
-            if value in self.ivm.data:
+            if isinstance(value, six.string_types) and value in self.ivm.data:
                 input_args.append(value)
                 ovl_bb = self.ivm.data[value].resample(data.grid).raw()[self.bb_slices]
                 input_args.append(ovl_bb)
@@ -156,6 +175,8 @@ class FabberProcess(Process):
             # Run one worker for each slice
             n = data_bb.shape[0]
 
+        self.debug(rundata)
+
         self.voxels_todo = np.count_nonzero(mask_bb)
         self.voxels_done = [0, ] * n
         self.start_bg(input_args, n_workers=n)
@@ -166,13 +187,13 @@ class FabberProcess(Process):
         """
         if self.queue.empty(): return
         while not self.queue.empty():
-            id, v, nv = self.queue.get()
-            if id < len(self.voxels_done):
-                self.voxels_done[id] = v
+            worker_id, voxels_done, _ = self.queue.get()
+            if worker_id < len(self.voxels_done):
+                self.voxels_done[id] = voxels_done
             else:
-                warn("Fabber: Id=%i in timeout (max %i)" % (id, len(self.voxels_done)))
-        cv = sum(self.voxels_done)
-        if self.voxels_todo > 0: complete = float(cv)/self.voxels_todo
+                self.warn("Fabber: Id=%i in timeout (max %i)" % (id, len(self.voxels_done)))
+        voxels_done_total = sum(self.voxels_done)
+        if self.voxels_todo > 0: complete = float(voxels_done_total)/self.voxels_todo
         else: complete = 1
         self.sig_progress.emit(complete)
 
@@ -184,15 +205,15 @@ class FabberProcess(Process):
         
         if self.status == Process.SUCCEEDED:
             # Only include log from first process to avoid multiple repetitions
-            for o in self.worker_output:
-                if o is not None and  hasattr(o, "log") and len(o.log) > 0:
-                    self.log = o.log
+            for out in self.worker_output:
+                if out is not None and  hasattr(out, "log") and out.log:
+                    self.log = out.log
                     break
             first = True
             data_keys = []
             self.data_items = []
-            for o in self.worker_output:
-                if len(o.data) > 0: data_keys = o.data.keys()
+            for out in self.worker_output:
+                if out.data: data_keys = out.data.keys()
             for key in data_keys:
                 self.debug(key)
                 recombined_data = self.recombine_data([o.data.get(key, None) for o in self.worker_output])
@@ -208,9 +229,9 @@ class FabberProcess(Process):
                     first = False
         else:
             # Include the log of the first failed process
-            for o in self.worker_output:
-                if o is not None and isinstance(o, Exception) and hasattr(o, "log") and len(o.log) > 0:
-                    self.log = o.log
+            for out in self.worker_output:
+                if out is not None and isinstance(out, Exception) and hasattr(out, "log") and out.log:
+                    self.log = out.log
                     break
 
     def output_data_items(self):

@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 import platform
 import shutil
 import subprocess
@@ -12,7 +13,7 @@ def update_version(name, rootdir):
     vfile.close()
 
     # Standardized version in form major.minor.patch-build
-    p = re.compile("v?(\d+\.\d+\.\d+(-\d+)?).*")
+    p = re.compile(r"v?(\d+\.\d+\.\d+(-\d+)?).*")
     m = p.match(full_version)
     if m is not None:
         std_version = m.group(1)
@@ -38,13 +39,17 @@ def build_plugin(package_name, rootdir, distdir, platform):
     packagedir = os.path.join(distdir, package_name)
     shutil.copytree(os.path.join(rootdir, package_name), packagedir)
     
-    # Copy Fabber shared lib and API
+    # Copy Fabber shared lib
     shlib_dir, shlib_template = get_lib_template(platform)
     LIB = os.path.join(fsldir, shlib_dir, shlib_template % "fabbercore_shared")
     print("%s -> %s" % (LIB, packagedir))
     shutil.copy(LIB, packagedir)
-    PYAPI = os.path.join(fsldir, "lib", "python", "fabber.py")
-    shutil.copy(PYAPI, os.path.join(packagedir, "fabber_api.py"))
+
+    # Copy Fabber Python API
+    fabmoddir = os.path.join(packagedir, "fabber")
+    import fabber
+    fabmod_src = os.path.abspath(os.path.dirname(fabber.__file__))
+    shutil.copytree(fabmod_src, fabmoddir)
 
 pkgdir = os.path.abspath(os.path.dirname(__file__))
 rootdir = os.path.abspath(os.path.join(pkgdir, os.pardir))
@@ -54,15 +59,15 @@ package_name = "fabber"
 sys.path.append(rootdir)
 
 if sys.platform.startswith("win"):
-    platform="win32"
+    platform = "win32"
     import create_msi
     build_platform_package = create_msi.create_msi
 elif sys.platform.startswith("linux"):
-    platform="linux"
+    platform = "linux"
     import create_deb
     build_platform_package = create_deb.create_deb
 elif sys.platform.startswith("darwin"):
-    platform="osx"
+    platform = "osx"
     import create_dmg
     build_platform_package = create_dmg.create_dmg
 

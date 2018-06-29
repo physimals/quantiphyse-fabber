@@ -1,4 +1,6 @@
 """
+Quantiphyse: Widgets for Fabber plugin
+
 Author: Martin Craig <martin.craig@eng.ox.ac.uk>
 Copyright (c) 2016-2017 University of Oxford, Martin Craig
 """
