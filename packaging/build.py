@@ -39,11 +39,12 @@ def build_plugin(package_name, rootdir, distdir, platform):
     packagedir = os.path.join(distdir, package_name)
     shutil.copytree(os.path.join(rootdir, package_name), packagedir)
     
-    # Copy Fabber shared lib
-    shlib_dir, shlib_template = get_lib_template(platform)
-    LIB = os.path.join(fsldir, shlib_dir, shlib_template % "fabbercore_shared")
-    print("%s -> %s" % (LIB, packagedir))
-    shutil.copy(LIB, packagedir)
+    # Copy Fabber shared libraries
+    for lib in ["fabbercore_shared", "fabber_models_t1"]:
+        shlib_dir, shlib_template = get_lib_template(platform)
+        LIB = os.path.join(fsldir, shlib_dir, shlib_template % lib)
+        print("%s -> %s" % (LIB, packagedir))
+        shutil.copy(LIB, packagedir)
 
     # Copy Fabber Python API
     fabmoddir = os.path.join(packagedir, "fabber")

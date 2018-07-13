@@ -43,7 +43,7 @@ def _run_fabber(worker_id, queue, options, main_data, roi, *add_data):
         if np.count_nonzero(roi) == 0:
             # Ignore runs with no voxel. Return placeholder object
             LOG.debug("No voxels")
-            return id, True, FabberRun({}, "")
+            return worker_id, True, FabberRun({}, "")
     
         options["data"] = main_data
         options["mask"] = roi
@@ -54,8 +54,8 @@ def _run_fabber(worker_id, queue, options, main_data, roi, *add_data):
             options[add_data[n]] = add_data[n+1]
             n += 2
             
-        api = FabberProcess.api(options)
-        run = api.run(options, progress_cb=_make_fabber_progress_cb(id, queue))
+        api = FabberProcess.api(options.pop("model-group", None))
+        run = api.run(options, progress_cb=_make_fabber_progress_cb(worker_id, queue))
         
         return worker_id, True, run
     except:
@@ -77,11 +77,6 @@ class FabberProcess(Process):
         Process.__init__(self, ivm, worker_fn=_run_fabber, **kwargs)
         self.grid = None
         self.data_items = []
-        
-    @staticmethod
-    def get_core_lib():
-        """ Get path to core shared library """
-        return get_local_shlib("fabbercore_shared", __file__)
     
     @staticmethod
     def get_model_group_name(lib):
@@ -93,63 +88,36 @@ class FabberProcess(Process):
             return lib.lower()
 
     @staticmethod
-    def get_model_group_lib(name):
-        """ Get the model group library path from the model group name"""
-        for lib in get_plugins(key="fabber-libs"):
-            libname = os.path.basename(lib)
-            if FabberProcess.get_model_group_name(libname) == name.lower():
-                return lib
-        return None
-
-    @staticmethod
-    def api(options=None):
-        """ Create a fabber API object """
-        if not options:
-            options = {}
-        options = dict(options) # Don't modify
-        model_libs = None
-        if "loadmodels" in options:
-            model_libs = [options.pop("loadmodels"),]
-        return Fabber(core_lib=FabberProcess.get_core_lib(), model_libs=model_libs)
-    
-    @staticmethod
-    def get_rundata(options=None):
-        """ 
-        Get rundata which is nearly a copy of options with a few changes 
-        Note default argument is safe because never modified if empty
+    def api(model_group=None):
         """
-        if not options:
-            options = {}
-        rundata = {}
-        for key in options.keys():
-            value = options.pop(key)
-            if value is not None: rundata[key] = value
-            else: rundata[key] = ""
+        Return a Fabber API object
+        """
+        core_lib = get_local_shlib("fabbercore_shared", __file__)
+        model_libs = []
+        if model_group:
+            for lib in get_plugins(key="fabber-libs"):
+                libname = os.path.basename(lib)
+                if FabberProcess.get_model_group_name(libname) == model_group.lower():
+                    model_libs.append(lib)
 
-        # Make sure we have minimal defaults to run
-        if "model" not in rundata: 
-            rundata["model"] = "poly"
-            rundata["degree"] = 2
-        rundata["method"] = rundata.get("method", "vb")
-        rundata["noise"] = rundata.get("noise", "white")
-    
-        # Look up the actual library which provides a model group
-        lib = FabberProcess.get_model_group_lib(rundata.pop("model-group", ""))
-        if lib is not None:
-            rundata["loadmodels"] = lib
-
-        return rundata
+        return Fabber(core_lib=core_lib, model_libs=model_libs)
 
     def run(self, options):
+        """
+        Run the Fabber process
+        """
         data = self.get_data(options, multi=True)
         self.grid = data.grid
         roi = self.get_roi(options, self.grid)
         
         self.output_rename = options.pop("output-rename", {})
-        rundata = self.get_rundata(options)
+
+        # Set some defaults
+        options["method"] = options.get("method", "vb")
+        options["noise"] = options.get("noise", "white")
 
         # Pass our input directory
-        rundata["indir"] = self.indir
+        options["indir"] = self.indir
 
         # Use smallest sub-array of the data which contains all unmasked voxels
         self.bb_slices = roi.get_bounding_box()
@@ -158,24 +126,26 @@ class FabberProcess(Process):
 
         # Pass in input data. To enable the multiprocessing module to split our volumes
         # up automatically we have to pass the arguments as a single list. This consists of
-        # rundata, main data, roi and then each of the used additional data items, name followed by data
-        input_args = [rundata, data_bb, mask_bb]
+        # options, main data, roi and then each of the used additional data items, name followed by data
+        input_args = [options, data_bb, mask_bb]
 
         # This is not perfect - we just grab all data matching an option value
-        for key, value in rundata.items():
+        for key in options.keys():
+            value = options[key]
             if isinstance(value, six.string_types) and value in self.ivm.data:
-                input_args.append(value)
-                ovl_bb = self.ivm.data[value].resample(data.grid).raw()[self.bb_slices]
-                input_args.append(ovl_bb)
+                extra_data = self.ivm.data[value].resample(data.grid).raw()[self.bb_slices]
+                input_args.append(key)
+                input_args.append(extra_data)
+                options.pop(key)
         
-        if rundata["method"] == "spatialvb":
+        if options["method"] == "spatialvb":
             # Spatial VB will not work properly in parallel
             n = 1
         else:
             # Run one worker for each slice
             n = data_bb.shape[0]
 
-        self.debug(rundata)
+        self.debug(options)
 
         self.voxels_todo = np.count_nonzero(mask_bb)
         self.voxels_done = [0, ] * n
@@ -189,9 +159,9 @@ class FabberProcess(Process):
         while not self.queue.empty():
             worker_id, voxels_done, _ = self.queue.get()
             if worker_id < len(self.voxels_done):
-                self.voxels_done[id] = voxels_done
+                self.voxels_done[worker_id] = voxels_done
             else:
-                self.warn("Fabber: Id=%i in timeout (max %i)" % (id, len(self.voxels_done)))
+                self.warn("Fabber: Id=%i in timeout (max %i)" % (worker_id, len(self.voxels_done)))
         voxels_done_total = sum(self.voxels_done)
         if self.voxels_todo > 0: complete = float(voxels_done_total)/self.voxels_todo
         else: complete = 1
@@ -206,7 +176,7 @@ class FabberProcess(Process):
         if self.status == Process.SUCCEEDED:
             # Only include log from first process to avoid multiple repetitions
             for out in self.worker_output:
-                if out is not None and  hasattr(out, "log") and out.log:
+                if out and  hasattr(out, "log") and len(out.log) > 0:
                     self.log = out.log
                     break
             first = True
@@ -230,9 +200,10 @@ class FabberProcess(Process):
         else:
             # Include the log of the first failed process
             for out in self.worker_output:
-                if out is not None and isinstance(out, Exception) and hasattr(out, "log") and out.log:
+                if out and isinstance(out, Exception) and hasattr(out, "log") and len(out.log) > 0:
                     self.log = out.log
                     break
 
     def output_data_items(self):
+        """ :return: List of names of data items Fabber is expecting to produce """
         return self.data_items
