@@ -13,8 +13,8 @@ class FabberWidgetTest(WidgetTest):
 
     def test_no_data(self):
         """ User clicks the run button with no data"""
-        if self.w.runBox.runBtn.isEnabled():
-            self.w.runBox.runBtn.clicked.emit()
+        if self.w.run_box.runBtn.isEnabled():
+            self.w.run_box.runBtn.clicked.emit()
         self.assertFalse(self.error)
 
     @unittest.skipIf("--fast" in sys.argv, "Slow test")
@@ -22,8 +22,8 @@ class FabberWidgetTest(WidgetTest):
         """ User loads some data and clicks the run button """
         self.ivm.add_data(self.data_4d, grid=self.grid, name="data_4d")
         self.ivm.add_roi(self.mask, grid=self.grid, name="mask")
-        self.w.runBox.runBtn.clicked.emit()
-        while not hasattr(self.w.runBox, "log"):
+        self.w.run_box.runBtn.clicked.emit()
+        while not hasattr(self.w.run_box, "log"):
             self.processEvents()
             time.sleep(2)
         self.assertTrue("mean_c0" in self.ivm.data)
