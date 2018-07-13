@@ -116,6 +116,11 @@ class FabberProcess(Process):
         options["method"] = options.get("method", "vb")
         options["noise"] = options.get("noise", "white")
 
+        # None is returned for blank YAML options - treat this as 'option set'
+        for key in options.keys():
+            if options[key] is None:
+                options[key] = True
+                
         # Pass our input directory
         options["indir"] = self.indir
 
