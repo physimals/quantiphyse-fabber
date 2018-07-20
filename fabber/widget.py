@@ -7,14 +7,20 @@ Copyright (c) 2016-2017 University of Oxford, Martin Craig
 
 from __future__ import division, unicode_literals, absolute_import, print_function
 
+import numpy as np
+
 from PySide import QtGui
 
-from quantiphyse.gui.widgets import QpWidget, Citation, TitleWidget, RunBox
+from quantiphyse.data import DataGrid
+from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumericOption, OutputNameOption
+from quantiphyse.gui.widgets import QpWidget, Citation, TitleWidget, RunBox, WarningBox
 from quantiphyse.utils import get_plugins, QpException
 
 from .process import FabberProcess
 from .dialogs import OptionsDialog, PriorsDialog
 from ._version import __version__
+
+from .fabber import FabberException, create_test_data
 
 FAB_CITE_TITLE = "Variational Bayesian inference for a non-linear forward model"
 FAB_CITE_AUTHOR = "Chappell MA, Groves AR, Whitcher B, Woolrich MW."
@@ -25,128 +31,64 @@ class FabberWidget(QpWidget):
     Widget for running Fabber model fitting
     """
     def __init__(self, **kwargs):
-        QpWidget.__init__(self, name="Fabber", icon="fabber", group="Fabber",
-                          desc="Fabber Bayesian model fitting", **kwargs)
+        QpWidget.__init__(self, **kwargs)
+        self._fabber_options = {
+            "degree" : 2,
+            "noise" : "white",
+            "save-mean" : True,
+            "save-model-fit" : True,
+            "save-model-extras" : True,
+        }
+        self._fabber_params = []
 
     def init_ui(self):
-        vbox = QtGui.QVBoxLayout()
-        self.setLayout(vbox)
+        self.vbox = QtGui.QVBoxLayout()
+        self.setLayout(self.vbox)
 
-        self.rundata = {}
-        self.rundata["model"] = "poly"
-        self.rundata["degree"] = "2"
-        self.rundata["method"] = "vb"
-        self.rundata["save-mean"] = ""
-        self.rundata["save-model-fit"] = ""
-        #self.rundata["save-model-extras"] = ""
-
-        title = TitleWidget(self, title="Fabber Bayesian Model Fitting", subtitle="Plugin %s" % __version__, help="fabber")
-        vbox.addWidget(title)
+        title = TitleWidget(self, subtitle="Plugin %s" % __version__, help="fabber")
+        self.vbox.addWidget(title)
         
         cite = Citation(FAB_CITE_TITLE, FAB_CITE_AUTHOR, FAB_CITE_JOURNAL)
-        vbox.addWidget(cite)
+        self.vbox.addWidget(cite)
 
-        # Options box
-        opts_box = QtGui.QGroupBox()
-        opts_box.setTitle('Options')
-        opts_box.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding, QtGui.QSizePolicy.MinimumExpanding)
-        grid = QtGui.QGridLayout()
-        opts_box.setLayout(grid)
+        self.options = OptionBox("Options")
+        self.options.sig_changed.connect(self._options_changed)
+        self.vbox.addWidget(self.options)
 
-        grid.addWidget(QtGui.QLabel("Model group"), 0, 0)
-        self.model_group_combo = QtGui.QComboBox(self)
-        self.model_group_combo.addItem("GENERIC", "")
-        for lib in get_plugins(key="fabber-libs"):
-            self.model_group_combo.addItem(FabberProcess.get_model_group_name(lib).upper())
-        self.model_group_combo.currentIndexChanged.connect(self._model_group_changed)
-        self.model_group_combo.setCurrentIndex(0)
-        grid.addWidget(self.model_group_combo, 0, 1)
-        
-        grid.addWidget(QtGui.QLabel("Model"), 1, 0)
-        self.model_combo = QtGui.QComboBox(self)
-        self.model_combo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
-        self.model_combo.currentIndexChanged.connect(self._model_changed)
-        grid.addWidget(self.model_combo, 1, 1)
-        self.model_opts_btn = QtGui.QPushButton('Model Options', self)
-        self.model_opts_btn.clicked.connect(self._show_model_options)
-        grid.addWidget(self.model_opts_btn, 1, 2)
-        
-        grid.addWidget(QtGui.QLabel("Inference method"), 4, 0)
-        self.method_combo = QtGui.QComboBox(self)
-        self.method_combo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
-        methods = self._api().get_methods()
-        for method in methods:
-            self.method_combo.addItem(method)
-        self.method_combo.setCurrentIndex(self.method_combo.findText(self.rundata["method"]))
-          
-        self.method_combo.currentIndexChanged.connect(self._method_changed)
-        grid.addWidget(self.method_combo, 4, 1)
-        self.method_opts_btn = QtGui.QPushButton('Inference Options', self)
-        self.method_opts_btn.clicked.connect(self._show_method_options)
-        grid.addWidget(self.method_opts_btn, 4, 2)
-        
-        grid.addWidget(QtGui.QLabel("Parameter priors"), 5, 0)
-        self.priors_btn = QtGui.QPushButton('Edit', self)
-        self.priors_btn.clicked.connect(self._show_prior_options)
-        grid.addWidget(self.priors_btn, 5, 2)
-        
-        grid.addWidget(QtGui.QLabel("General Options"), 6, 0)
-        self.general_opts_btn = QtGui.QPushButton('Edit', self)
-        self.general_opts_btn.clicked.connect(self._show_general_options)
-        grid.addWidget(self.general_opts_btn, 6, 2)
-        
-        vbox.addWidget(opts_box)
-
-        # Run box
-        self.run_box = RunBox(self.get_process, self.get_options, title="Run Fabber", save_option=True)
-        vbox.addWidget(self.run_box)
-
-        vbox.addStretch(1)
-
-        self._model_group_changed()
-        self._method_changed()
+        self.warn_box = WarningBox("")
+        self.warn_box.setVisible(False)
+        self.vbox.addWidget(self.warn_box)
 
     def _model_group_changed(self):
-        idx = self.model_group_combo.currentIndex()
-        if idx >= 0:
-            self.rundata["model-group"] = self.model_group_combo.currentText()
-        else:
-            self.rundata.pop("model-group", None)
-
-        # Update the list of models
         models = self._api().get_models()
-        self.model_combo.blockSignals(True)
-        try:
-            self.model_combo.clear()
-            for model in models:
-                self.model_combo.addItem(model)
-        finally:
-            self.model_combo.blockSignals(False)
-            if self.rundata.get("model", "") in models:
-                self.model_combo.setCurrentIndex(self.model_combo.findText(self.rundata["model"]))
-            else:
-                self.model_combo.setCurrentIndex(0)
+        self.debug("Models: %s", models)
+        self.options.option("model").setChoices(models)
       
-    def _model_changed(self):
-        model = self.model_combo.currentText()
-        self.rundata["model"] = model
+    def _options_changed(self):
+        self._fabber_options.update(self.options.values())
+        self.debug("Options changed:\n%s", self._fabber_options)
+        self._update_params()
 
-    def _method_changed(self):
-        method = self.method_combo.currentText()
-        self.rundata["method"] = method
+    def _update_params(self):
+        try:
+            self._fabber_params = self._api().get_model_params(self._fabber_options)
+            self.warn_box.setVisible(False)
+        except FabberException, exc:
+            self._fabber_params = []
+            self.warn_box.text.setText("Invalid model options:\n\n%s" % str(exc))
+            self.warn_box.setVisible(True)
 
     def _show_model_options(self):
-        model = self.rundata["model"]
-        dlg = OptionsDialog(self, ivm=self.ivm, rundata=self.rundata, desc_first=True)
+        model = self._fabber_options["model"]
+        dlg = OptionsDialog(self, ivm=self.ivm, rundata=self._fabber_options, desc_first=True)
         opts, desc = self._api().get_options(model=model)
         dlg.set_title("Forward Model: %s" % model, desc)
         dlg.set_options(opts)
-        if dlg.exec_():
-            pass
+        dlg.exec_()
 
     def _show_method_options(self):
-        method = self.rundata["method"]
-        dlg = OptionsDialog(self, ivm=self.ivm, rundata=self.rundata, desc_first=True)
+        method = self._fabber_options["method"]
+        dlg = OptionsDialog(self, ivm=self.ivm, rundata=self._fabber_options, desc_first=True)
         opts, desc = self._api().get_options(method=method)
         # Ignore prior options which have their own dialog
         opts = [o for o in opts if "PSP_byname" not in o["name"] and o["name"] != "param-spatial-priors"]
@@ -156,7 +98,7 @@ class FabberWidget(QpWidget):
         dlg.exec_()
         
     def _show_general_options(self):
-        dlg = OptionsDialog(self, ivm=self.ivm, rundata=self.rundata, desc_first=True)
+        dlg = OptionsDialog(self, ivm=self.ivm, rundata=self._fabber_options, desc_first=True)
         dlg.ignore("model", "method", "output", "data", "mask", "data<n>", "overwrite", "help",
                    "listmodels", "listmethods", "link-to-latest", "data-order", "dump-param-names",
                    "loadmodels")
@@ -166,9 +108,9 @@ class FabberWidget(QpWidget):
         dlg.exec_()
         
     def _show_prior_options(self):
-        dlg = PriorsDialog(self, ivm=self.ivm, rundata=self.rundata)
+        dlg = PriorsDialog(self, ivm=self.ivm, rundata=self._fabber_options)
         try:
-            params = self._api().get_model_params(self.rundata)
+            params = self._api().get_model_params(self._fabber_options)
         except Exception, exc:
             raise QpException("Unable to get list of model parameters\n\n%s\n\nModel options must be set before parameters can be listed" % str(exc))
         dlg.set_params(params)
@@ -179,15 +121,132 @@ class FabberWidget(QpWidget):
         """
         :return: Fabber API object with the current model group selected
         """
-        return FabberProcess.api(self.rundata.get("model-group", None))
-
-    def get_process(self):
-        process = FabberProcess(self.ivm)
-        return process
+        return FabberProcess.api(self._fabber_options["model-group"])
 
     def get_options(self):
         # Must return a copy as process may modify
-        return dict(self.rundata)
+        return dict(self._fabber_options)
+
+    def get_process(self):
+        return FabberProcess(self.ivm)
 
     def batch_options(self):
         return "Fabber", self.get_options()
+   
+class FabberModellingWidget(FabberWidget):
+    """
+    Widget for running Fabber model fitting
+    """
+
+    def __init__(self, **kwargs):
+        super(FabberModellingWidget, self).__init__(name="Fabber", icon="fabber", group="Fabber",
+                                                    desc="Fabber Bayesian model fitting", **kwargs)
+
+    def init_ui(self):
+        FabberWidget.init_ui(self)
+
+        self.run_box = RunBox(self.get_process, self.get_options, title="Run Fabber", save_option=True)
+        self.vbox.addWidget(self.run_box)
+        self.vbox.addStretch(1)
+
+        model_opts_btn = QtGui.QPushButton('Model Options')
+        method_opts_btn = QtGui.QPushButton('Method Options')
+        edit_priors_btn = QtGui.QPushButton('Edit Priors')
+        options_btn = QtGui.QPushButton('Edit')
+
+        self.options.add("Main input data", DataOption(self.ivm), key="data")
+        self.options.add("Model group", ChoiceOption(), key="model-group")
+        self.options.add("Model", ChoiceOption(), model_opts_btn, key="model")
+        self.options.add("Parameter priors", edit_priors_btn)
+        self.options.add("Inference method", ChoiceOption(), method_opts_btn, key="method")
+        self.options.add("General options", options_btn)
+
+        self.options.option("model-group").sig_changed.connect(self._model_group_changed)
+        method_opts_btn.clicked.connect(self._show_method_options)
+        model_opts_btn.clicked.connect(self._show_model_options)
+        edit_priors_btn.clicked.connect(self._show_prior_options)
+        options_btn.clicked.connect(self._show_general_options)
+        
+        model_groups = ["GENERIC", ]
+        for lib in get_plugins(key="fabber-libs"):
+            model_groups.append(FabberProcess.get_model_group_name(lib).upper())
+        self.options.option("model-group").setChoices(model_groups)
+        self.options.option("model-group").value = "GENERIC"
+        self._model_group_changed()
+
+        self.options.option("model").value = "poly"
+        self.options.option("method").setChoices(self._api().get_methods())
+        self.options.option("method").value = "vb"
+        self._options_changed()
+
+class SimData(FabberWidget):
+    """
+    Widget which uses Fabber models to generate simulated data
+    """
+    def __init__(self, **kwargs):
+        super(SimData, self).__init__(name="Simulated Fabber Data", icon="fabber", 
+                                      desc="Generate test data sets from Fabber models", 
+                                      group="Simulation", **kwargs)
+        self._param_test_values = {"c0" : [-100, 0, 100], "c1" : [-10, 0, 10], "c2" : [-1, 0, 1]}
+
+    def init_ui(self):
+        FabberWidget.init_ui(self)
+        
+        self.param_values_box = OptionBox("Parameter values")
+        self.param_values_box.sig_changed.connect(self._param_values_changed)
+        self.vbox.addWidget(self.param_values_box)
+
+        run_btn = QtGui.QPushButton('Generate test data', self)
+        run_btn.clicked.connect(self._run)
+        self.vbox.addWidget(run_btn)
+        
+        self.vbox.addStretch(1)
+
+        model_opts_btn = QtGui.QPushButton('Model Options')
+        model_opts_btn.clicked.connect(self._show_model_options)
+
+        self.options.add("Model group", ChoiceOption(), key="model-group")
+        self.options.add("Model", ChoiceOption(), model_opts_btn, key="model")
+        self.options.add("Number of volumes (time points)", NumericOption(intonly=True, minval=1, maxval=100, default=10), key="num-vols")
+        self.options.add("Voxels per patch (approx)", NumericOption(intonly=True, minval=1, maxval=10000, default=1000), key="num-voxels")
+        self.options.add("Noise (Gaussian std.dev)", NumericOption(intonly=True, minval=0, maxval=1000, default=0), key="noise")
+        self.options.add("Output data name", OutputNameOption(initial="fabber_test_data"), key="output-name")
+        self.options.option("model-group").sig_changed.connect(self._model_group_changed)
+
+        model_groups = ["GENERIC", ]
+        for lib in get_plugins(key="fabber-libs"):
+            model_groups.append(FabberProcess.get_model_group_name(lib).upper())
+        self.options.option("model-group").setChoices(model_groups)
+        self.options.option("model-group").value = "GENERIC"
+        self._model_group_changed()
+
+        self.options.option("model").value = "poly"
+        self._options_changed()
+ 
+    def _update_params(self):
+        FabberWidget._update_params(self)
+        self.param_values_box.clear()
+        for param in self._fabber_params:
+            current_values = self._param_test_values.get(param, [1.0])
+            self.param_values_box.add(param, VectorOption(initial=current_values))
+
+    def _param_values_changed(self):
+        self._param_test_values = self.param_values_box.values()
+        num_variable = len([1 for v in self._param_test_values.values() if len(v) > 1])
+        if num_variable > 3:
+            self.warn("Cannot have more than 3 varying parameters")
+        
+    def _run(self):
+        options = self.options.values()
+        patchsize = int(options["num-voxels"] ** (1. / 3)) + 1
+        data = create_test_data(self._api(), self._fabber_options, self._param_test_values, nt=options["num-vols"], patchsize=patchsize, noise=options["noise"])
+        if isinstance(data, tuple): 
+            data = data[0]
+        self.debug("Data shape: %s", data.shape)
+        self.ivm.add_data(data, name=options["output-name"], grid=DataGrid(data.shape[:3], np.identity(4)))
+      
+    #def get_process(self):
+    #    return FabberProcess(self.ivm)
+  
+    def batch_options(self):
+        return "FabberTestData", self.get_options()
