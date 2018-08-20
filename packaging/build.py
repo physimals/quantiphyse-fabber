@@ -55,7 +55,7 @@ def build_plugin(package_name, rootdir, distdir, platform):
 pkgdir = os.path.abspath(os.path.dirname(__file__))
 rootdir = os.path.abspath(os.path.join(pkgdir, os.pardir))
 distdir = os.path.join(rootdir, "dist")
-package_name = "fabber"
+package_name = "fabberqp"
 
 sys.path.append(rootdir)
 
@@ -81,4 +81,4 @@ if "--snapshot" in sys.argv:
 
 print("Building plugin")
 build_plugin(package_name, rootdir, distdir, platform)
-build_platform_package("qp-" + package_name, package_name, distdir, pkgdir, v[1], version_str_display)
+build_platform_package(package_name, package_name, distdir, pkgdir, v[1], version_str_display)
