@@ -116,9 +116,9 @@ data 'STR#' (5002, "English") {
                         (rez, tmpFile, dmgFile))
         os.system('hdiutil flatten -quiet "%s"' % dmgFile)
     if ret == 0:
-        print "Successfully added license to '%s'" % dmgFile
+        print("Successfully added license to '%s'" % dmgFile)
     else:
-        print "Failed to add license to '%s'" % dmgFile
+        print("Failed to add license to '%s'" % dmgFile)
 
 def add_apps_link(dmg_path):
     """ 
