@@ -20,8 +20,6 @@ from .process import FabberProcess
 from .dialogs import OptionsDialog, PriorsDialog
 from ._version import __version__
 
-from .fabber import FabberException, create_test_data
-
 FAB_CITE_TITLE = "Variational Bayesian inference for a non-linear forward model"
 FAB_CITE_AUTHOR = "Chappell MA, Groves AR, Whitcher B, Woolrich MW."
 FAB_CITE_JOURNAL = "IEEE Transactions on Signal Processing 57(1):223-236, 2009."
@@ -70,6 +68,7 @@ class FabberWidget(QpWidget):
         self._update_params()
 
     def _update_params(self):
+        from fabber import FabberException
         try:
             self._fabber_params = self._api().get_model_params(self._fabber_options)
             self.warn_box.setVisible(False)
@@ -239,7 +238,8 @@ class SimData(FabberWidget):
     def _run(self):
         options = self.options.values()
         patchsize = int(options["num-voxels"] ** (1. / 3)) + 1
-        data = create_test_data(self._api(), self._fabber_options, self._param_test_values, nt=options["num-vols"], patchsize=patchsize, noise=options["noise"])
+        from fabber import generate_test_data
+        data = generate_test_data(self._api(), self._fabber_options, self._param_test_values, nt=options["num-vols"], patchsize=patchsize, noise=options["noise"])
         if isinstance(data, tuple): 
             data = data[0]
         self.debug("Data shape: %s", data.shape)

@@ -11,4 +11,5 @@ QP_MANIFEST = {
     "widgets" : [FabberModellingWidget, SimData],
     "widget-tests" : [FabberWidgetTest],
     "processes" : [FabberProcess],
+    "module-dirs" : ["deps",],
 }

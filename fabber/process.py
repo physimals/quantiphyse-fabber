@@ -16,9 +16,6 @@ import numpy as np
 from quantiphyse.processes import Process
 from quantiphyse.utils import get_plugins, get_local_shlib, QpException
 
-# The Fabber API is bundled with the plugin
-from .fabber import Fabber, FabberRun
-
 LOG = logging.getLogger(__name__)
 
 def _make_fabber_progress_cb(worker_id, queue):
@@ -35,6 +32,7 @@ def _run_fabber(worker_id, queue, options, main_data, roi, *add_data):
     """
     Function to run Fabber in a multiprocessing environment
     """
+    from fabber import FabberRun
     try:
         indir = options.pop("indir")
         if indir:
@@ -92,6 +90,7 @@ class FabberProcess(Process):
         """
         Return a Fabber API object
         """
+        from fabber import Fabber
         core_lib = get_local_shlib("fabbercore_shared", __file__)
         model_libs = []
         if model_group:

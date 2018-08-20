@@ -47,7 +47,7 @@ def build_plugin(package_name, rootdir, distdir, platform):
         shutil.copy(LIB, packagedir)
 
     # Copy Fabber Python API
-    fabmoddir = os.path.join(packagedir, "fabber")
+    fabmoddir = os.path.join(packagedir, "deps", "fabber")
     import fabber
     fabmod_src = os.path.abspath(os.path.dirname(fabber.__file__))
     shutil.copytree(fabmod_src, fabmoddir)
