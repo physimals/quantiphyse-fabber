@@ -7,16 +7,13 @@ Copyright (c) 2016-2017 University of Oxford, Martin Craig
 
 from __future__ import division, unicode_literals, absolute_import, print_function
 
-import numpy as np
-
 from PySide import QtGui
 
-from quantiphyse.data import DataGrid
-from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumericOption, OutputNameOption
+from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumericOption, OutputNameOption, BoolOption
 from quantiphyse.gui.widgets import QpWidget, Citation, TitleWidget, RunBox, WarningBox
 from quantiphyse.utils import get_plugins, QpException
 
-from .process import FabberProcess
+from .process import FabberProcess, FabberTestDataProcess
 from .dialogs import OptionsDialog, PriorsDialog
 from ._version import __version__
 
@@ -81,9 +78,11 @@ class FabberWidget(QpWidget):
         model = self._fabber_options["model"]
         dlg = OptionsDialog(self, ivm=self.ivm, rundata=self._fabber_options, desc_first=True)
         opts, desc = self._api().get_options(model=model)
+        self.debug("Model options: %s", opts)
         dlg.set_title("Forward Model: %s" % model, desc)
         dlg.set_options(opts)
         dlg.exec_()
+        self._update_params()
 
     def _show_method_options(self):
         method = self._fabber_options["method"]
@@ -92,6 +91,7 @@ class FabberWidget(QpWidget):
         # Ignore prior options which have their own dialog
         opts = [o for o in opts if "PSP_byname" not in o["name"] and o["name"] != "param-spatial-priors"]
         dlg.set_title("Inference method: %s" % method, desc)
+        self.debug("Method options: %s", opts)
         dlg.set_options(opts)
         dlg.fit_width()
         dlg.exec_()
@@ -123,7 +123,7 @@ class FabberWidget(QpWidget):
         return FabberProcess.api(self._fabber_options["model-group"])
 
     def get_options(self):
-        # Must return a copy as process may modify
+        """ Return a copy of current Fabber options """
         return dict(self._fabber_options)
 
     def get_process(self):
@@ -210,6 +210,8 @@ class SimData(FabberWidget):
         self.options.add("Voxels per patch (approx)", NumericOption(intonly=True, minval=1, maxval=10000, default=1000), key="num-voxels")
         self.options.add("Noise (Gaussian std.dev)", NumericOption(intonly=True, minval=0, maxval=1000, default=0), key="noise")
         self.options.add("Output data name", OutputNameOption(initial="fabber_test_data"), key="output-name")
+        self.options.add("Output noise-free data", BoolOption(), key="save-clean")
+        self.options.add("Output parameter ROIs", BoolOption(), key="save-rois")
         self.options.option("model-group").sig_changed.connect(self._model_group_changed)
 
         model_groups = ["GENERIC", ]
@@ -235,18 +237,19 @@ class SimData(FabberWidget):
         if num_variable > 3:
             self.warn("Cannot have more than 3 varying parameters")
         
+    def get_options(self):
+        """ Return a copy of current Fabber options and parameter test values """
+        options = dict(self._fabber_options)
+        options["param-test-values"] = self._param_test_values
+        return options
+        
     def _run(self):
-        options = self.options.values()
-        patchsize = int(options["num-voxels"] ** (1. / 3)) + 1
-        from fabber import generate_test_data
-        data = generate_test_data(self._api(), self._fabber_options, self._param_test_values, nt=options["num-vols"], patchsize=patchsize, noise=options["noise"])
-        if isinstance(data, tuple): 
-            data = data[0]
-        self.debug("Data shape: %s", data.shape)
-        self.ivm.add_data(data, name=options["output-name"], grid=DataGrid(data.shape[:3], np.identity(4)))
-      
-    #def get_process(self):
-    #    return FabberProcess(self.ivm)
+        process = self.get_process()
+        options = self.get_options()
+        process.run(options)
+        
+    def get_process(self):
+        return FabberTestDataProcess(self.ivm)
   
     def batch_options(self):
         return "FabberTestData", self.get_options()

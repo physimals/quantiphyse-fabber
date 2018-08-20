@@ -4,12 +4,12 @@ import unittest
 
 from quantiphyse.test.widget_test import WidgetTest
 
-from .widget import FabberWidget
+from .widget import FabberModellingWidget
 
 class FabberWidgetTest(WidgetTest):
 
     def widget_class(self):
-        return FabberWidget
+        return FabberModellingWidget
 
     def test_no_data(self):
         """ User clicks the run button with no data"""

@@ -1,14 +1,22 @@
+"""
+Widgets for controlling different types of Fabber options
+
+Copyright (c) 2016-2018 University of Oxford, Martin Craig
+"""
+
+import os
 import logging
-import traceback
 
 from PySide import QtCore, QtGui
 
 from quantiphyse.gui.widgets import OverlayCombo
-from quantiphyse.utils import QpException
 
 LOG = logging.getLogger(__name__)
 
 def get_label(text="", size=None, bold=False, italic=False):
+    """
+    :return: QtGui.QLabel with specified text and attributes
+    """
     label = QtGui.QLabel(text)
     font = label.font()
     font.setBold(bold)
@@ -18,6 +26,9 @@ def get_label(text="", size=None, bold=False, italic=False):
     return label
 
 class OptionWidget(QtCore.QObject):
+    """
+    Widget which allows a Fabber option to be controlled
+    """
     def __init__(self, opt, **kwargs):
         super(OptionWidget, self).__init__()
         self.key = opt["name"]
@@ -25,7 +36,8 @@ class OptionWidget(QtCore.QObject):
         self.req = not opt["optional"]
         self.default = opt["default"]
         self.desc = opt["description"]
-        self.rundata = kwargs.get("rundata", {})
+
+        self.options = kwargs.get("options", {})
         self.ivm = kwargs.get("ivm", None)
         self.desc_first = kwargs.get("desc_first", False)
         self.dependents = []
@@ -52,8 +64,11 @@ class OptionWidget(QtCore.QObject):
             self.widgets.append(self.enable_cb)
             self.checked = False
 
-    def update(self, rundata):
-        val = rundata.get(self.key, None)
+    def update(self, options):
+        """
+        Update the displayed option value from an options dictionary
+        """
+        val = options.get(self.key, None)
         if val is not None:
             self.set_value(val)
             if self.enable_cb is not None:
@@ -63,30 +78,51 @@ class OptionWidget(QtCore.QObject):
             if self.enable_cb is not None:
                 self.enable_cb.setChecked(False)
         # Make sure visibility is updated even if state is unchanged
-        if self.enable_cb is not None: self._checkbox_toggled()
+        if self.enable_cb is not None: 
+            self._checkbox_toggled()
+
+    def update_options(self):
+        """
+        Update the options dictionary from the current displayed value
+        """
+        if self.checked:
+            self.options[self.key] = self.get_value()
+        elif self.key in self.options:
+            del self.options[self.key]
+        LOG.debug(self.options)
 
     def set_value(self, value):
-        # Override to display the current option value in some form
+        """ Set the displayed option value """
         pass
     
     def get_value(self):
-        # Override to retrieve the current option value from the UI widgets
+        """ Get the displayed option value """
         return ""
 
-    def update_rundata(self):
-        if self.checked:
-            self.rundata[self.key] = self.get_value()
-        elif self.key in self.rundata:
-            del self.rundata[self.key]
-        LOG.debug(self.rundata)
+    def set_visible(self, visible=True):
+        """ Set the visibility of the option widget """
+        for widget in self.widgets:
+            widget.setVisible(visible)
 
-    def add_dependent(self, dep):
-        if not self.enable_cb: return
-        self.dependents.append(dep)
-        dep.set_visible(self.checked)
-        if not self.checked: dep.enable_cb.setChecked(False)
+    def set_enabled(self, enabled=True):
+        """ Set the enabled (greyed out) status of the option widget """
+        for widget in self.widgets:
+            widget.setEnabled(enabled)
+        # Checkbox is always enabled!
+        if self.enable_cb is not None: 
+            self.enable_cb.setEnabled(True)
 
     def add(self, grid, row):
+        """ 
+        Add the option widget to a grid layout
+        
+        This base method adds the label/description and checkbox if required.
+        Subclasses should call this method first and then add their own specific
+        widget to column 1 of the grid
+
+        :param grid: QtGui.QGridLayout 
+        :param row: Row index number
+        """
         if self.desc_first:
             label = self.desclabel
         else:
@@ -101,15 +137,16 @@ class OptionWidget(QtCore.QObject):
             hbox.addWidget(label, row)
             grid.addLayout(hbox, row, 0)
 
-    def set_visible(self, visible=True):
-        for widget in self.widgets:
-             widget.setVisible(visible)
+    def add_dependent(self, dep):
+        """
+        Add another OptionWidget as a dependent
 
-    def set_enabled(self, enabled=True):
-        for widget in self.widgets:
-             widget.setEnabled(enabled)
-        # Checkbox is always enabled!
-        if self.enable_cb is not None: self.enable_cb.setEnabled(True)
+        Dependent widgets are only visible when the parent widget is enabled/checked
+        """
+        if not self.enable_cb: return
+        self.dependents.append(dep)
+        dep.set_visible(self.checked)
+        if not self.checked: dep.enable_cb.setChecked(False)
 
     def _checkbox_toggled(self):
         # This function is only called if we have a checkbox
@@ -120,53 +157,58 @@ class OptionWidget(QtCore.QObject):
             dep.set_visible(self.checked)
             if not self.checked: dep.enable_cb.setChecked(False)
 
-        self.update_rundata()
+        self.update_options()
         
 class IntegerOptionWidget(OptionWidget):
+    """
+    Option which allows an integer to be chosen using a spin box
+    """
     def __init__(self, opt, **kwargs):
         OptionWidget.__init__(self, opt, **kwargs)
-        self.sb = QtGui.QSpinBox()
-        self.sb.valueChanged.connect(self.update_rundata)
-        self.widgets.append(self.sb)
+        self.spin = QtGui.QSpinBox()
+        self.spin.valueChanged.connect(self.update_options)
+        self.widgets.append(self.spin)
     
     def get_value(self):
-        return str(self.sb.value())
+        return str(self.spin.value())
         
-    def set_value(self, val):
-        if val == "":
+    def set_value(self, value):
+        if value == "":
             try:
-                self.sb.setValue(int(self.default))
-            except:
-                self.sb.setValue(0)
+                self.spin.setValue(int(self.default))
+            except ValueError:
+                self.spin.setValue(0)
         else:
-            self.sb.setValue(int(val))
+            self.spin.setValue(int(value))
 
     def add(self, grid, row):
         OptionWidget.add(self, grid, row)
-        grid.addWidget(self.sb, row, 1)
+        grid.addWidget(self.spin, row, 1)
 
 class StringOptionWidget(OptionWidget):
+    """
+    OptionWidget allowing a text string to be entered
+    """
     def __init__(self, opt, **kwargs):
         OptionWidget.__init__(self, opt, **kwargs)
         self.edit = QtGui.QLineEdit()
-        self.edit.editingFinished.connect(self.update_rundata)
+        self.edit.editingFinished.connect(self.update_options)
         self.widgets.append(self.edit)
             
     def get_value(self):
         return self.edit.text()
         
-    def set_value(self, val):
-        self.edit.setText(val)
+    def set_value(self, value):
+        self.edit.setText(value)
 
-    def add(self, grid, row):
-        OptionWidget.add(self, grid, row)
-        grid.addWidget(self.sb, row, 1)
-        
     def add(self, grid, row):
         OptionWidget.add(self, grid, row)
         grid.addWidget(self.edit, row, 1)
 
 class FileOptionWidget(StringOptionWidget):
+    """
+    OptionWidget allowing a file name to be chosen using a standard file selector
+    """
     def __init__(self, opt, **kwargs):
         StringOptionWidget.__init__(self, opt, **kwargs)
         self.hbox = QtGui.QHBoxLayout()
@@ -182,21 +224,28 @@ class FileOptionWidget(StringOptionWidget):
         if dialog.exec_():
             fname = dialog.selectedFiles()[0]
             self.edit.setText(fname)
-            self.update_rundata()
+            self.update_options()
 
     def add(self, grid, row):
         OptionWidget.add(self, grid, row)
         grid.addLayout(self.hbox, row, 1)
 
+class VestParseError(Exception):
+    """ Failure to parse a VEST matrix file """
+    pass
+
 class MatrixFileOptionWidget(FileOptionWidget):
+    """
+    Option which allows the user to choose a file containing a matrix
+    """
     def __init__(self, opt, **kwargs):
         FileOptionWidget.__init__(self, opt, **kwargs)
-        self.editBtn = QtGui.QPushButton("Edit")
-        self.hbox.addWidget(self.editBtn)
-        self.widgets.append(self.editBtn)
-        self.editBtn.clicked.connect(self.edit_file)
+        edit_btn = QtGui.QPushButton("Edit")
+        self.hbox.addWidget(edit_btn)
+        self.widgets.append(edit_btn)
+        edit_btn.clicked.connect(self._edit_file)
     
-    def read_vest(self, fname):
+    def _read_vest(self, fname):
         f = None
         in_matrix = False
         mat = []
@@ -207,30 +256,30 @@ class MatrixFileOptionWidget(FileOptionWidget):
             for line in lines:
                 if in_matrix:
                     nums = [float(num) for num in line.split()]
-                    if len(nums) != nx: raise Exception ("Incorrect number of x values")
+                    if len(nums) != nx: raise VestParseError("Incorrect number of x values")
                     mat.append(nums)
                 elif line.startswith("/Matrix"):
-                  if nx == 0 or ny == 0: raise Exception("Missing /NumWaves or /NumPoints")
-                  in_matrix = True
+                    if nx == 0 or ny == 0: raise VestParseError("Missing /NumWaves or /NumPoints")
+                    in_matrix = True
                 elif line.startswith("/NumWaves"):
-                  parts = line.split()
-                  if len(parts) == 1: raise Exception("No number following /NumWaves")
-                  nx = int(parts[1])
+                    parts = line.split()
+                    if len(parts) == 1: raise VestParseError("No number following /NumWaves")
+                    nx = int(parts[1])
                 elif line.startswith("/NumPoints") or line.startswith("/NumContrasts"):
-                  parts = line.split()
-                  if len(parts) == 1: raise Exception("No number following /NumPoints")
-                  ny = int(parts[1])
+                    parts = line.split()
+                    if len(parts) == 1: raise VestParseError("No number following /NumPoints")
+                    ny = int(parts[1])
             if len(mat) != ny:
-                raise Exception("Incorrect number of y values")      
+                raise VestParseError("Incorrect number of y values")      
         finally:
             if f is not None: f.close()
 
         if not in_matrix: 
-            raise QpException("File '%s' does not contain a VEST matrix" % fname)
+            raise VestParseError("File '%s' does not seem to contain a VEST matrix" % fname)
         else:
             return mat, ""
 
-    def read_ascii(self, fname):
+    def _read_ascii(self, fname):
         f = None
         in_matrix = False
         mat = []
@@ -255,67 +304,64 @@ class MatrixFileOptionWidget(FileOptionWidget):
 
         return mat, desc
 
-    def write_vest(self, fname, m, desc=""):
+    def _write_vest(self, fname, matrix):
         f = None
         try:
             f = open(fname, "w")
-            nx, ny = len(m), len(m[0])
+            nx, ny = len(matrix), len(matrix[0])
             f.write("/NumWaves %i\n" % nx)
             f.write("/NumPoints %i\n" % ny)
             f.write("/Matrix\n")
-            for row in m:
+            for row in matrix:
                 for item in row:
                     f.write("%f " % item)
                 f.write("\n")
         finally:
             if f is not None: f.close()
 
-    def write_ascii(self, fname, m, desc=""):
+    def _write_ascii(self, fname, matrix, desc=""):
         f = None
         try:
             f = open(fname, "w")
             for line in desc.splitlines():
                 f.write("#%s\n" % line)
-            for row in m:
+            for row in matrix:
                 f.write(" ".join([str(v) for v in row]))
                 f.write("\n")
         finally:
             if f is not None: f.close()
 
-    def edit_file(self):
+    def _edit_file(self):
         fname = self.edit.text()
         if fname.strip() == "":
-            msgBox = QtGui.QMessageBox()
-            msgBox.setText("Enter a filename")
-            msgBox.setStandardButtons(QtGui.QMessageBox.Ok)
-            msgBox.exec_()
+            msg_box = QtGui.QMessageBox()
+            msg_box.setText("Enter a filename")
+            msg_box.setStandardButtons(QtGui.QMessageBox.Ok)
+            msg_box.exec_()
             return
         elif not os.path.exists(fname):
-            msgBox = QtGui.QMessageBox()
-            msgBox.setText("File does not exist - create?")
-            msgBox.setStandardButtons(QtGui.QMessageBox.Ok | QtGui.QMessageBox.Cancel)
-            msgBox.setDefaultButton(QtGui.QMessageBox.Ok)
-            ret = msgBox.exec_()
+            msg_box = QtGui.QMessageBox()
+            msg_box.setText("File does not exist - create?")
+            msg_box.setStandardButtons(QtGui.QMessageBox.Ok | QtGui.QMessageBox.Cancel)
+            msg_box.setDefaultButton(QtGui.QMessageBox.Ok)
+            ret = msg_box.exec_()
             if ret != QtGui.QMessageBox.Ok:
                 return
             open(fname, "a").close()
 
         try:
-            try:
-                mat, desc = self.read_vest(fname)
-                ascii = False
-            except:
-                mat, desc = self.read_ascii(fname)
-                ascii = True
-            self.mat_dialog.set_matrix(mat, desc)
-            if self.mat_dialog.exec_():
-                mat, desc = self.mat_dialog.get_matrix()
-                if ascii:
-                    self.write_ascii(fname, mat, desc)
-                else:
-                    self.write_vest(fname, mat, desc)
-        except:
-            traceback.print_exc()
+            mat, desc = self._read_vest(fname)
+            ascii = False
+        except VestParseError:
+            mat, desc = self._read_ascii(fname)
+            ascii = True
+        self.mat_dialog.set_matrix(mat, desc)
+        if self.mat_dialog.exec_():
+            mat, desc = self.mat_dialog.get_matrix()
+            if ascii:
+                self._write_ascii(fname, mat, desc)
+            else:
+                self._write_vest(fname, mat)
 
 class ImageOptionWidget(OptionWidget):
     """
@@ -330,8 +376,8 @@ class ImageOptionWidget(OptionWidget):
     def get_value(self):
         return self.combo.currentText()
 
-    def set_value(self, val):
-        idx = self.combo.findText(val)
+    def set_value(self, value):
+        idx = self.combo.findText(value)
         self.combo.setCurrentIndex(idx)
 
     def add(self, grid, row):
@@ -349,5 +395,10 @@ OPT_VIEW = {
 }
 
 def get_option_widget(opt, **kwargs):
+    """
+    Get an option widget for a Fabber option
+
+    :param opt: Option as a dictionary, as returned by Fabber.get_options
+    """
     return OPT_VIEW.get(opt["type"], StringOptionWidget)(opt, **kwargs)
    

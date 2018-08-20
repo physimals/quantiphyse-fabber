@@ -1,3 +1,8 @@
+"""
+Dynamically generated options dialogs for Fabber models and inference methods
+
+Copyright (c) 2016-2018 University of Oxford, Martin Craig
+"""
 import logging
 
 from PySide import QtGui, QtCore
@@ -6,75 +11,92 @@ from quantiphyse.gui.widgets import OverlayCombo
 
 from .option_widgets import get_option_widget, get_label
 
-NUMBERED_OPTIONS_MAX=20
+#: Maximum number of instances of 'numbered' options (e.g. PSP_byname<n>) """
+NUMBERED_OPTIONS_MAX = 20
+
 LOG = logging.getLogger(__name__)
 
 def _del(rundata, key):
     if key in rundata: del rundata[key]
 
-class GenericOptionsDialog(QtGui.QDialog):
-    def __init__(self, parent=None, title="Options", desc="", **kwargs):
-        super(GenericOptionsDialog, self).__init__(parent)
-        
-        vbox = QtGui.QVBoxLayout()
-        self.setLayout(vbox)
-
-        self.title_label = get_label(size=20)
-        vbox.addWidget(self.title_label)
-        
-        self.desc_label = get_label(bold=True, italic=True)
-        vbox.addWidget(self.desc_label)
-
-        self.scrollArea = QtGui.QScrollArea()
-        self.scrollArea.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setMinimumHeight(500)
-        self.scrollAreaContents = QtGui.QWidget()
-        self.grid = QtGui.QGridLayout(self.scrollAreaContents)
-        self.scrollArea.setWidget(self.scrollAreaContents)
-        vbox.addWidget(self.scrollArea)
-
-        self.buttonBox = QtGui.QDialogButtonBox()
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Close)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-        vbox.addWidget(self.buttonBox)
-
-    def fit_width(self):
-        w = self.scrollAreaContents.minimumSizeHint().width() + self.scrollArea.verticalScrollBar().width()
-        self.scrollArea.setMinimumWidth(max(w, 600))
-        
-class OptionsDialog(GenericOptionsDialog):
-
-    """ An option has been changed """
+class OptionsDialog(QtGui.QDialog):
+    """
+    QtGui.QDialog which displays dynamically generated Fabber options (e.g. for method or model)
+    """
+    
+    #: Signal when option value is changed
     sig_changed = QtCore.Signal(str)
 
     def __init__(self, parent=None, title="Options", desc="", **kwargs):
         super(OptionsDialog, self).__init__(parent)
-        self.set_title(title, desc)
+        vbox = QtGui.QVBoxLayout()
+        self.setLayout(vbox)
+
+        self.title_label = get_label(title, size=20)
+        vbox.addWidget(self.title_label)
+        
+        self.desc_label = get_label(desc, bold=True, italic=True)
+        vbox.addWidget(self.desc_label)
+
+        self.scroll_area = QtGui.QScrollArea()
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setMinimumHeight(500)
+        self.scroll_area_content = QtGui.QWidget()
+        self.grid = QtGui.QGridLayout(self.scroll_area_content)
+        self.scroll_area.setWidget(self.scroll_area_content)
+        vbox.addWidget(self.scroll_area)
+
+        button_box = QtGui.QDialogButtonBox()
+        button_box.setOrientation(QtCore.Qt.Horizontal)
+        button_box.setStandardButtons(QtGui.QDialogButtonBox.Close)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        vbox.addWidget(button_box)
+
         self.desc_first = kwargs.get("desc_first", False)
         self.ivm = kwargs.get("ivm", None)
         self.rundata = kwargs.get("rundata", None)
+        self.options = []
         self.ignore_opts = set()
         self.option_widgets = []
 
+    def fit_width(self):
+        """
+        Adjust the width of the dialog to fit the required options plus a possible scrollbar
+        """
+        width = self.scroll_area_content.minimumSizeHint().width() + self.scroll_area.verticalScrollBar().width()
+        self.scroll_area.setMinimumWidth(max(width, 600))
+        
     def set_title(self, title, desc=""):
+        """ 
+        Set title and optional description for the dialog 
+        """
         self.title_label.setText(title)
         self.desc_label.setText(desc)
-        
+
     def set_options(self, opts):
+        """
+        Set the options to be displayed in the dialog
+
+        :param opts: Options as sequence of options dictionary, as returned by Fabber.get_options()
+        """
         self._clear_options()
-        self.opts = [o for o in opts if o["name"] not in self.ignore_opts]
+        self.options = [o for o in opts if o["name"] not in self.ignore_opts]
         self._create_opts_ui()
 
     def ignore(self, *opts):
+        """
+        Ignore certain options
+
+        :param opts: Sequence of names of options to ignore
+        """
         for opt in opts:
             self.ignore_opts.add(opt)
 
     def _create_opts_ui(self):
-        req = [opt for opt in self.opts if not opt["optional"]]
-        nonreq = [opt for opt in self.opts if opt["optional"]]
+        req = [opt for opt in self.options if not opt["optional"]]
+        nonreq = [opt for opt in self.options if opt["optional"]]
         
         if req:
             label = get_label("Mandatory options", size=14, bold=True)
@@ -93,43 +115,48 @@ class OptionsDialog(GenericOptionsDialog):
 
     def _del_layout(self, layout):
         while True:
-            w = layout.takeAt(0)
-            if w is None:
+            item = layout.takeAt(0)
+            if item is None:
                 break
-            elif w.widget() is None:
-                self._del_layout(w)    
+            elif item.widget() is None:
+                self._del_layout(item)    
             else:
-                w.widget().deleteLater()
+                item.widget().deleteLater()
                 
-    def _add_option_widget(self, opt, row):
-        w = get_option_widget(opt, rundata=self.rundata, ivm=self.ivm, desc_first=self.desc_first)
-        w.update(self.rundata)
-        w.add(self.grid, row)
-        # Need to keep in scope or they get GC'd! FIXME this suggests the design is rubbish
-        self.option_widgets.append(w)
-        return w
-
     def _add_opts(self, opts, startrow):
         row = 0
         for opt in opts:
             if opt["name"].find("<n>") >= 0:
                 # This is a numbered option. Create multiple widgets, each dependent on the previous
-                opt_base=opt["name"][:opt["name"].find("<n>")]
+                opt_base = opt["name"][:opt["name"].find("<n>")]
                 opt_suffix = opt["name"][opt["name"].find("<n>") + 3:]
+                prev = None
                 for n in range(1, NUMBERED_OPTIONS_MAX+1):
                     newopt = dict(opt)
                     newopt["name"] = "%s%i%s" % (opt_base, n, opt_suffix)
-                    w = self._add_option_widget(newopt, row+startrow)
-                    if n > 1:
-                        prev.add_dependent(w)
-                    prev = w
+                    widget = self._add_option_widget(newopt, row+startrow)
+                    if prev is not None:
+                        prev.add_dependent(widget)
+                    prev = widget
+                    row += 1
             else:
                 self._add_option_widget(opt, row+startrow)
-            row += 1
+                row += 1
             
         return row
 
+    def _add_option_widget(self, opt, row):
+        widget = get_option_widget(opt, options=self.rundata, ivm=self.ivm, desc_first=self.desc_first)
+        widget.update(self.rundata)
+        widget.add(self.grid, row)
+        # Need to keep in scope or they get GC'd! FIXME this suggests the design is rubbish
+        self.option_widgets.append(widget)
+        return widget
+
 class PriorsDialog(OptionsDialog):
+    """
+    OptionsDialog which displays parameter priors
+    """
 
     TITLE = "Model parameter priors"
     DESC = "Describes optional prior information about each model parameter"
@@ -142,7 +169,12 @@ class PriorsDialog(OptionsDialog):
         self.params = []
         
     def set_params(self, params):
-        LOG.debug("Params=", params, self.params)
+        """
+        Set the model parameters
+
+        :param params: Sequence of parameter names
+        """
+        LOG.debug("Params=%s", params)
         self.params = params
         self._repopulate()
 
@@ -205,18 +237,18 @@ class PriorsDialog(OptionsDialog):
         trans_combo.currentIndexChanged.connect(self._changed)
 
         return (type_combo, 
-               QtGui.QLabel("Image: "), 
-               image_combo, 
-               mean_cb, 
-               QtGui.QLabel("Custom mean: "), 
-               mean_edit,
-               prec_cb, 
-               QtGui.QLabel("Custom precision: "), 
-               prec_edit,
-               trans_combo)
+                QtGui.QLabel("Image: "), 
+                image_combo, 
+                mean_cb, 
+                QtGui.QLabel("Custom mean: "), 
+                mean_edit,
+                prec_cb, 
+                QtGui.QLabel("Custom precision: "), 
+                prec_edit,
+                trans_combo)
 
     def _update_widgets(self):
-         for idx, param in enumerate(self.params):
+        for idx in range(len(self.params)):
             w = self.prior_widgets[idx]
         
             prior_type = w[0].itemData(w[0].currentIndex())
@@ -243,7 +275,7 @@ class PriorsDialog(OptionsDialog):
         self._update_rundata()
 
     def _update_rundata(self):
-        prior_idx=1
+        prior_idx = 1
         for idx, param in enumerate(self.params):
             w = self.prior_widgets[idx]
             prior_type = w[0].itemData(w[0].currentIndex())
@@ -282,7 +314,7 @@ class PriorsDialog(OptionsDialog):
         self.grid.setSpacing(20)
         self.prior_widgets = []
         
-        if len(self.params) == 0:
+        if not self.params:
             self.grid.addWidget(QtGui.QLabel("No parameters found! Make sure model is properly configured"))
 
         for idx, param in enumerate(self.params):
