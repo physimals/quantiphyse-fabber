@@ -20,8 +20,8 @@ class FabberWidgetTest(WidgetTest):
     @unittest.skipIf("--fast" in sys.argv, "Slow test")
     def test_just_click_run(self):
         """ User loads some data and clicks the run button """
-        self.ivm.add_data(self.data_4d, grid=self.grid, name="data_4d")
-        self.ivm.add_roi(self.mask, grid=self.grid, name="mask")
+        self.ivm.add(self.data_4d, grid=self.grid, name="data_4d")
+        self.ivm.add(self.mask, grid=self.grid, name="mask")
         self.w.run_box.runBtn.clicked.emit()
         while not hasattr(self.w.run_box, "log"):
             self.processEvents()

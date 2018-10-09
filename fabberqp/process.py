@@ -101,6 +101,17 @@ class FabberProcess(Process):
 
         return Fabber(core_lib=core_lib, model_libs=model_libs)
 
+    @staticmethod
+    def fix_data_params(api, ivm, options):
+        known_options = api.get_options(generic=True, model=options.get("model", None), method=options.get("method", None))[0]
+        for key in options.keys():
+            if api.is_data_option(key, known_options):
+                data_option = ivm.data.get(options[key], None)
+                if data_option is not None:
+                    options[key] = data_option.resample(data.grid).raw()[self.bb_slices]
+                else:
+                    raise QpException("Fabber option '%s' expected data item but data set '%s' not found" % (key, options[key]))
+    
     def run(self, options):
         """
         Run the Fabber process
@@ -141,7 +152,7 @@ class FabberProcess(Process):
         known_options = api.get_options(generic=True, model=options.get("model", None), method=options.get("method", None))[0]
         for key in options.keys():
             if api.is_data_option(key, known_options):
-                data_option = self.ivm.data.get(options[key], self.ivm.rois.get(options[key], None))
+                data_option = self.ivm.data.get(options[key], None)
                 if data_option is not None:
                     extra_data = data_option.resample(data.grid).raw()[self.bb_slices]
                     input_args.append(key)
@@ -205,7 +216,7 @@ class FabberProcess(Process):
                     else:
                         full_data = np.zeros(self.grid.shape)
                     full_data[self.bb_slices] = recombined_data
-                    self.ivm.add_data(full_data, grid=self.grid, name=name, make_current=first)
+                    self.ivm.add(full_data, grid=self.grid, name=name, make_current=first)
                     first = False
         else:
             # Include the log of the first failed process
@@ -253,16 +264,16 @@ class FabberTestDataProcess(Process):
         if grid_data_name is None:
             grid = DataGrid(data.shape[:3], np.identity(4))
         else:
-            grid_data = self.ivm.data.get(grid_data_name, self.ivm.rois.get(grid_data_name, None))
+            grid_data = self.ivm.data.get(grid_data_name, None)
             if grid_data is None:
                 raise QpException("Data not found for output grid: %s" % grid_data_name)
             grid = grid_data.grid
 
-        self.ivm.add_data(data, name=output_name, grid=grid, make_current=True)
+        self.ivm.add(data, name=output_name, grid=grid, make_current=True)
 
         clean_data = test_data.get("clean", None)
         if clean_data is not None:
-            self.ivm.add_data(clean_data, name="%s_clean" % output_name, grid=grid, make_current=False)
+            self.ivm.add(clean_data, name="%s_clean" % output_name, grid=grid, make_current=False)
 
         for param, param_roi in test_data.get("param-rois", {}).items():
-            self.ivm.add_roi(param_roi, name="%s_roi_%s" % (output_name, param), grid=grid)
+            self.ivm.add(param_roi, name="%s_roi_%s" % (output_name, param), grid=grid)

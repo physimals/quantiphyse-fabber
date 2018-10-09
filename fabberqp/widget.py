@@ -67,7 +67,9 @@ class FabberWidget(QpWidget):
     def _update_params(self):
         from fabber import FabberException
         try:
-            self._fabber_params = self._api().get_model_params(self._fabber_options)
+            api = self._api()
+            FabberProcess.fix_data_params(api, self.ivm, self._fabber_options)
+            self._fabber_params = api.get_model_params(self._fabber_options)
             self.warn_box.setVisible(False)
         except FabberException, exc:
             self._fabber_params = []
@@ -109,7 +111,9 @@ class FabberWidget(QpWidget):
     def _show_prior_options(self):
         dlg = PriorsDialog(self, ivm=self.ivm, rundata=self._fabber_options)
         try:
-            params = self._api().get_model_params(self._fabber_options)
+            api = self._api()
+            FabberProcess.fix_data_params(api, self.ivm, self._fabber_options)
+            params = api.get_model_params(self._fabber_options)
         except Exception, exc:
             raise QpException("Unable to get list of model parameters\n\n%s\n\nModel options must be set before parameters can be listed" % str(exc))
         dlg.set_params(params)
