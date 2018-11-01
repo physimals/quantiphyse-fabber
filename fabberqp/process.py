@@ -101,17 +101,6 @@ class FabberProcess(Process):
 
         return Fabber(core_lib=core_lib, model_libs=model_libs)
 
-    @staticmethod
-    def fix_data_params(api, ivm, options):
-        known_options = api.get_options(generic=True, model=options.get("model", None), method=options.get("method", None))[0]
-        for key in options.keys():
-            if api.is_data_option(key, known_options):
-                data_option = ivm.data.get(options[key], None)
-                if data_option is not None:
-                    options[key] = data_option.resample(data.grid).raw()[self.bb_slices]
-                else:
-                    raise QpException("Fabber option '%s' expected data item but data set '%s' not found" % (key, options[key]))
-    
     def run(self, options):
         """
         Run the Fabber process

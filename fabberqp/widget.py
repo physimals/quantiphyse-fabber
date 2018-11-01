@@ -7,6 +7,8 @@ Copyright (c) 2016-2017 University of Oxford, Martin Craig
 
 from __future__ import division, unicode_literals, absolute_import, print_function
 
+import numpy as np
+
 from PySide import QtGui
 
 from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumericOption, OutputNameOption, BoolOption
@@ -64,12 +66,24 @@ class FabberWidget(QpWidget):
         self.debug("Options changed:\n%s", self._fabber_options)
         self._update_params()
 
+    def _fix_data_params(self, api):
+        """
+        Given a set of Fabber options, replace those that should be data items with a Numpy array
+        """
+        options = dict(self._fabber_options)
+        known_options = api.get_options(generic=True, model=options.get("model", None), method=options.get("method", None))[0]
+        for key in options:
+            if api.is_data_option(key, known_options):
+                # Just provide a placeholder
+                options[key] = np.zeros((1, 1, 1))
+        return options
+
     def _update_params(self):
         from fabber import FabberException
         try:
             api = self._api()
-            FabberProcess.fix_data_params(api, self.ivm, self._fabber_options)
-            self._fabber_params = api.get_model_params(self._fabber_options)
+            options = self._fix_data_params(api)
+            self._fabber_params = api.get_model_params(options)
             self.warn_box.setVisible(False)
         except FabberException, exc:
             self._fabber_params = []
@@ -112,8 +126,8 @@ class FabberWidget(QpWidget):
         dlg = PriorsDialog(self, ivm=self.ivm, rundata=self._fabber_options)
         try:
             api = self._api()
-            FabberProcess.fix_data_params(api, self.ivm, self._fabber_options)
-            params = api.get_model_params(self._fabber_options)
+            options = self._fix_data_params(api)
+            params = api.get_model_params(options)
         except Exception, exc:
             raise QpException("Unable to get list of model parameters\n\n%s\n\nModel options must be set before parameters can be listed" % str(exc))
         dlg.set_params(params)
