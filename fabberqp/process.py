@@ -161,13 +161,13 @@ class FabberProcess(Process):
         self.voxels_done = [0, ] * n_workers
         self.start_bg(input_args, n_workers=n_workers)
 
-    def timeout(self):
+    def timeout(self, queue):
         """
         Check the queue and emit sig_progress
         """
-        if self.queue.empty(): return
-        while not self.queue.empty():
-            worker_id, voxels_done, _ = self.queue.get()
+        if queue.empty(): return
+        while not queue.empty():
+            worker_id, voxels_done, _ = queue.get()
             if worker_id < len(self.voxels_done):
                 self.voxels_done[worker_id] = voxels_done
             else:
@@ -177,7 +177,7 @@ class FabberProcess(Process):
         else: complete = 1
         self.sig_progress.emit(complete)
 
-    def finished(self):
+    def finished(self, worker_output):
         """ 
         Add output data to the IVM and set the log 
         """
@@ -185,18 +185,18 @@ class FabberProcess(Process):
         
         if self.status == Process.SUCCEEDED:
             # Only include log from first process to avoid multiple repetitions
-            for out in self.worker_output:
+            for out in worker_output:
                 if out and  hasattr(out, "log") and len(out.log) > 0:
                     self.log = out.log
                     break
             first = True
             data_keys = []
             self.data_items = []
-            for out in self.worker_output:
+            for out in worker_output:
                 if out.data: data_keys = out.data.keys()
             for key in data_keys:
                 self.debug(key)
-                recombined_data = self.recombine_data([o.data.get(key, None) for o in self.worker_output])
+                recombined_data = self.recombine_data([o.data.get(key, None) for o in worker_output])
                 name = self.output_rename.get(key, key)
                 if key is not None:
                     self.data_items.append(name)
@@ -209,7 +209,7 @@ class FabberProcess(Process):
                     first = False
         else:
             # Include the log of the first failed process
-            for out in self.worker_output:
+            for out in worker_output:
                 if out and isinstance(out, Exception) and hasattr(out, "log") and len(out.log) > 0:
                     self.log = out.log
                     break
