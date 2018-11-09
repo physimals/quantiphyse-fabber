@@ -181,13 +181,11 @@ class FabberProcess(Process):
         """ 
         Add output data to the IVM and set the log 
         """
-        self.log = ""
-        
         if self.status == Process.SUCCEEDED:
             # Only include log from first process to avoid multiple repetitions
             for out in worker_output:
                 if out and  hasattr(out, "log") and len(out.log) > 0:
-                    self.log = out.log
+                    self.log(out.log)
                     break
             first = True
             data_keys = []
@@ -211,7 +209,7 @@ class FabberProcess(Process):
             # Include the log of the first failed process
             for out in worker_output:
                 if out and isinstance(out, Exception) and hasattr(out, "log") and len(out.log) > 0:
-                    self.log = out.log
+                    self.log(out.log)
                     break
 
     def output_data_items(self):
