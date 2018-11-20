@@ -24,8 +24,8 @@ def _make_fabber_progress_cb(worker_id, queue):
     number of voxels processed onto the queue
     """
     def _progress_cb(voxel, nvoxels):
-        if (voxel % 100 == 0) or (voxel == nvoxels):
-            queue.put((worker_id, voxel, nvoxels))
+        queue.put((worker_id, voxel, nvoxels))
+        
     return _progress_cb
 
 def _run_fabber(worker_id, queue, options, main_data, roi, *add_data):
@@ -54,7 +54,6 @@ def _run_fabber(worker_id, queue, options, main_data, roi, *add_data):
             
         api = FabberProcess.api(options.pop("model-group", None))
         run = api.run(options, progress_cb=_make_fabber_progress_cb(worker_id, queue))
-        
         return worker_id, True, run
     except:
         import traceback
@@ -167,14 +166,12 @@ class FabberProcess(Process):
         """
         if queue.empty(): return
         while not queue.empty():
-            worker_id, voxels_done, _ = queue.get()
+            worker_id, done, todo = queue.get()
             if worker_id < len(self.voxels_done):
-                self.voxels_done[worker_id] = voxels_done
+                self.voxels_done[worker_id] = float(done) / todo
             else:
                 self.warn("Fabber: Id=%i in timeout (max %i)" % (worker_id, len(self.voxels_done)))
-        voxels_done_total = sum(self.voxels_done)
-        if self.voxels_todo > 0: complete = float(voxels_done_total)/self.voxels_todo
-        else: complete = 1
+        complete = sum(self.voxels_done) / len(self.voxels_done)
         self.sig_progress.emit(complete)
 
     def finished(self, worker_output):
