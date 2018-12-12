@@ -106,6 +106,14 @@ class FabberProcess(Process):
 
         FIXME need to be able to pass matrix options as actual matrices
         """
+        # Take a copy of the options dict and then clean it out to avoid
+        # warnings in batch mode. Fabber logfile will warn about unusued
+        # options itself
+        new_options = options.copy()
+        for key in list(options.keys()):
+            options.pop(key)
+        options = new_options
+        
         data = self.get_data(options, multi=True)
         self.grid = data.grid
         roi = self.get_roi(options, self.grid)
@@ -240,6 +248,7 @@ class FabberTestDataProcess(Process):
             raise QpException("No test values given for model parameters")
 
         api = FabberProcess.api(options.pop("model-group", None))
+        from fabber import generate_test_data
         test_data = generate_test_data(api, options, param_test_values, **kwargs)
         
         data = test_data["data"]
