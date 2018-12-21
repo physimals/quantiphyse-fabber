@@ -89,14 +89,15 @@ class FabberProcess(Process):
         """
         Return a Fabber API object
         """
-        from fabber import Fabber
+        #from fabber.api_cl import FabberCl as Fabber
+        from fabber.api_shlib import FabberShlib as Fabber
         core_lib = get_local_shlib("fabbercore_shared", __file__)
-        model_libs = []
+        model_libs = {}
         if model_group:
             for lib in get_plugins(key="fabber-libs"):
                 libname = os.path.basename(lib)
                 if FabberProcess.get_model_group_name(libname) == model_group.lower():
-                    model_libs.append(lib)
+                    model_libs[model_group.lower()] = lib
 
         return Fabber(core_lib=core_lib, model_libs=model_libs)
 
