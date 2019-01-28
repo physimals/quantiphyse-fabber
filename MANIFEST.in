@@ -1,2 +1,1 @@
 include requirements.txt
-include quantiphyse_fabber/*.png quantiphyse_fabber/*.svg
