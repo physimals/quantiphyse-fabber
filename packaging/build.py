@@ -55,7 +55,7 @@ def build_plugin(package_name, rootdir, distdir, platform):
 pkgdir = os.path.abspath(os.path.dirname(__file__))
 rootdir = os.path.abspath(os.path.join(pkgdir, os.pardir))
 distdir = os.path.join(rootdir, "dist")
-package_name = "fabberqp"
+package_name = "quantiphyse_fabber"
 
 sys.path.append(rootdir)
 

@@ -1,0 +1,3 @@
+pyfab
+numpy
+quantiphyse

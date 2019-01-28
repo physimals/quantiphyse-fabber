@@ -13,7 +13,7 @@ from PySide import QtGui
 
 from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumericOption, OutputNameOption, BoolOption
 from quantiphyse.gui.widgets import QpWidget, Citation, TitleWidget, RunBox, WarningBox
-from quantiphyse.utils import get_plugins, QpException
+from quantiphyse.utils import QpException
 
 from .process import FabberProcess, FabberTestDataProcess
 from .dialogs import OptionsDialog, PriorsDialog
@@ -57,7 +57,7 @@ class FabberWidget(QpWidget):
         self.vbox.addWidget(self.warn_box)
 
     def _model_group_changed(self):
-        models = self._api().get_models()
+        models = FabberProcess.api().get_models(model_group=self._fabber_options.get("model-group", None))
         self.debug("Models: %s", models)
         self.options.option("model").setChoices(models)
       
@@ -81,7 +81,7 @@ class FabberWidget(QpWidget):
     def _update_params(self):
         from fabber import FabberException
         try:
-            api = self._api()
+            api = FabberProcess.api()
             options = self._fix_data_params(api)
             self._fabber_params = api.get_model_params(options)
             self.warn_box.setVisible(False)
@@ -93,7 +93,7 @@ class FabberWidget(QpWidget):
     def _show_model_options(self):
         model = self._fabber_options["model"]
         dlg = OptionsDialog(self, ivm=self.ivm, rundata=self._fabber_options, desc_first=True)
-        opts, desc = self._api().get_options(model=model)
+        opts, desc = FabberProcess.api().get_options(model=model)
         self.debug("Model options: %s", opts)
         dlg.set_title("Forward Model: %s" % model, desc)
         dlg.set_options(opts)
@@ -103,7 +103,7 @@ class FabberWidget(QpWidget):
     def _show_method_options(self):
         method = self._fabber_options["method"]
         dlg = OptionsDialog(self, ivm=self.ivm, rundata=self._fabber_options, desc_first=True)
-        opts, desc = self._api().get_options(method=method)
+        opts, desc = FabberProcess.api().get_options(method=method)
         # Ignore prior options which have their own dialog
         opts = [o for o in opts if "PSP_byname" not in o["name"] and o["name"] != "param-spatial-priors"]
         dlg.set_title("Inference method: %s" % method, desc)
@@ -117,7 +117,7 @@ class FabberWidget(QpWidget):
         dlg.ignore("model", "method", "output", "data", "mask", "data<n>", "overwrite", "help",
                    "listmodels", "listmethods", "link-to-latest", "data-order", "dump-param-names",
                    "loadmodels")
-        opts, _ = self._api().get_options()
+        opts, _ = FabberProcess.api().get_options()
         dlg.set_options(opts)
         dlg.fit_width()
         dlg.exec_()
@@ -125,7 +125,7 @@ class FabberWidget(QpWidget):
     def _show_prior_options(self):
         dlg = PriorsDialog(self, ivm=self.ivm, rundata=self._fabber_options)
         try:
-            api = self._api()
+            api = FabberProcess.api()
             options = self._fix_data_params(api)
             params = api.get_model_params(options)
         except Exception, exc:
@@ -133,12 +133,6 @@ class FabberWidget(QpWidget):
         dlg.set_params(params)
         dlg.fit_width()
         dlg.exec_()
-        
-    def _api(self):
-        """
-        :return: Fabber API object with the current model group selected
-        """
-        return FabberProcess.api(self._fabber_options["model-group"])
 
     def get_options(self):
         """ Return a copy of current Fabber options """
@@ -184,15 +178,16 @@ class FabberModellingWidget(FabberWidget):
         edit_priors_btn.clicked.connect(self._show_prior_options)
         options_btn.clicked.connect(self._show_general_options)
         
-        model_groups = ["GENERIC", ]
-        for lib in get_plugins(key="fabber-libs"):
-            model_groups.append(FabberProcess.get_model_group_name(lib).upper())
+        model_groups = []
+        for group in FabberProcess.api().get_model_groups():
+            if group == "": group = "GENERIC"
+            model_groups.append(group.upper())
         self.options.option("model-group").setChoices(model_groups)
-        self.options.option("model-group").value = "GENERIC"
+        #self.options.option("model-group").value = "GENERIC"
         self._model_group_changed()
 
         self.options.option("model").value = "poly"
-        self.options.option("method").setChoices(self._api().get_methods())
+        self.options.option("method").setChoices(FabberProcess.api().get_methods())
         self.options.option("method").value = "vb"
         self._options_changed()
 
@@ -232,11 +227,12 @@ class SimData(FabberWidget):
         self.options.add("Output parameter ROIs", BoolOption(), key="save-rois")
         self.options.option("model-group").sig_changed.connect(self._model_group_changed)
 
-        model_groups = ["GENERIC", ]
-        for lib in get_plugins(key="fabber-libs"):
-            model_groups.append(FabberProcess.get_model_group_name(lib).upper())
+        model_groups = []
+        for group in FabberProcess.api().get_model_groups():
+            if group == "": group = "GENERIC"
+            model_groups.append(group.upper())
         self.options.option("model-group").setChoices(model_groups)
-        self.options.option("model-group").value = "GENERIC"
+        #self.options.option("model-group").value = "GENERIC"
         self._model_group_changed()
 
         self.options.option("model").value = "poly"

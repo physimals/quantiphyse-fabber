@@ -14,7 +14,7 @@ import numpy as np
 
 from quantiphyse.data import DataGrid
 from quantiphyse.processes import Process
-from quantiphyse.utils import get_plugins, get_local_shlib, QpException
+from quantiphyse.utils import get_plugins, QpException
 
 LOG = logging.getLogger(__name__)
 
@@ -89,17 +89,9 @@ class FabberProcess(Process):
         """
         Return a Fabber API object
         """
-        #from fabber.api_cl import FabberCl as Fabber
-        from fabber.api_shlib import FabberShlib as Fabber
-        core_lib = get_local_shlib("fabbercore_shared", __file__)
-        model_libs = {}
-        if model_group:
-            for lib in get_plugins(key="fabber-libs"):
-                libname = os.path.basename(lib)
-                if FabberProcess.get_model_group_name(libname) == model_group.lower():
-                    model_libs[model_group.lower()] = lib
-
-        return Fabber(core_lib=core_lib, model_libs=model_libs)
+        from fabber import Fabber
+        search_dirs = get_plugins(key="fabber-dirs")
+        return Fabber(*search_dirs)
 
     def run(self, options):
         """
