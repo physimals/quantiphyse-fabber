@@ -1,12 +1,15 @@
 Fabber plugin for Quantiphyse
+=============================
 
-To build, use python packaging/build.py. Currently it does not make any 
-sense to install using the setup script.
+Quantiphyse is a visualisation and data analysis tool for volumetric
+medical imaging data especially MRI. See https://quantiphyse.org for more
+information.
 
-The plugin is in dist/fabber and can be copied into the Quantiphyse
-plugins folder.
+Fabber is a model fitting tool designed to fit nonlinear parameterised 
+models to 4D fMRI data such as ASL, CEST, DCE, DSC, etc.
 
-A platform-specific package is also created in dist/ (e.g. DEB, DMG
-or MSI)
+To install, either use the setup script or:
 
+    pip install quantiphyse-fabber
 
+The plugin will then be available from within Quantiphyse
