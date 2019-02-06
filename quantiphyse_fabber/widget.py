@@ -85,7 +85,7 @@ class FabberWidget(QpWidget):
             options = self._fix_data_params(api)
             self._fabber_params = api.get_model_params(options)
             self.warn_box.setVisible(False)
-        except FabberException, exc:
+        except FabberException as exc:
             self._fabber_params = []
             self.warn_box.text.setText("Invalid model options:\n\n%s" % str(exc))
             self.warn_box.setVisible(True)
@@ -128,7 +128,7 @@ class FabberWidget(QpWidget):
             api = FabberProcess.api()
             options = self._fix_data_params(api)
             params = api.get_model_params(options)
-        except Exception, exc:
+        except Exception as exc:
             raise QpException("Unable to get list of model parameters\n\n%s\n\nModel options must be set before parameters can be listed" % str(exc))
         dlg.set_params(params)
         dlg.fit_width()
