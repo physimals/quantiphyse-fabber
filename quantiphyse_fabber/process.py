@@ -24,8 +24,12 @@ def _make_fabber_progress_cb(worker_id, queue):
     number of voxels processed onto the queue
     """
     def _progress_cb(voxel, nvoxels):
-        queue.put((worker_id, voxel, nvoxels))
-        
+        percent = int(100*float(voxel)/nvoxels)
+        if percent != _progress_cb.last_percent:
+            _progress_cb.last_percent = percent
+            queue.put((worker_id, voxel, nvoxels))
+
+    _progress_cb.last_percent = 0
     return _progress_cb
 
 def _run_fabber(worker_id, queue, options, main_data, roi, *add_data):
