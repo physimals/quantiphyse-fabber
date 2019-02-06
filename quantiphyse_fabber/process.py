@@ -143,7 +143,7 @@ class FabberProcess(Process):
         # Determine which of the options should be treated as data sets and add them to the input args
         api = self.api(options.get("model-group", None))
         known_options = api.get_options(generic=True, model=options.get("model", None), method=options.get("method", None))[0]
-        for key in options.keys():
+        for key in list(options.keys()):
             if api.is_data_option(key, known_options):
                 data_option = self.ivm.data.get(options[key], None)
                 if data_option is not None:
