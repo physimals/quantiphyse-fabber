@@ -10,6 +10,7 @@ import logging
 from PySide import QtCore, QtGui
 
 from quantiphyse.gui.widgets import OverlayCombo
+from quantiphyse.gui.options import NumberListOption
 
 LOG = logging.getLogger(__name__)
 
@@ -384,6 +385,46 @@ class ImageOptionWidget(OptionWidget):
         OptionWidget.add(self, grid, row)
         grid.addWidget(self.combo, row, 1)
 
+class ListOptionWidget(OptionWidget):
+    """
+    OptionWidget subclass for a list of values
+    """
+    def __init__(self, opt, **kwargs):
+        OptionWidget.__init__(self, opt, **kwargs)
+        self.edit = NumberListOption(intonly=opt["type"] == "INT")
+        self.edit.sig_changed.connect(self.update_options)
+        self.widgets.append(self.edit)
+
+    def get_value(self):
+        print("returning ", self.edit.value)
+        return self.edit.value
+        
+    def set_value(self, value):
+        print("setting ", value)
+        self.edit.value = value
+
+    def add(self, grid, row):
+        OptionWidget.add(self, grid, row)
+        grid.addWidget(self.edit, row, 1)
+
+    def update_options(self):
+        """
+        Update the options dictionary from the current displayed value
+        """
+        if self.checked:
+            values = self.get_value()
+            for idx, value in enumerate(values):
+                key = self.key.replace("<n>", str(idx+1))
+                self.options[key] = value
+        else:
+            idx = 1
+            while 1:
+                key = self.key.replace("<n>", str(idx))
+                if key not in self.options:
+                    break
+                del self.options[key]
+        LOG.debug(self.options)
+
 OPT_VIEW = {
     "INT" : IntegerOptionWidget,
     "BOOL": OptionWidget,
@@ -400,5 +441,10 @@ def get_option_widget(opt, **kwargs):
 
     :param opt: Option as a dictionary, as returned by Fabber.get_options
     """
-    return OPT_VIEW.get(opt["type"], StringOptionWidget)(opt, **kwargs)
+
+    if opt["name"].find("<n>") >= 0:
+        print("numeric list")
+        return ListOptionWidget(opt, **kwargs)
+    else:
+        return OPT_VIEW.get(opt["type"], StringOptionWidget)(opt, **kwargs)
    

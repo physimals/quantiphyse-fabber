@@ -126,7 +126,9 @@ class OptionsDialog(QtGui.QDialog):
     def _add_opts(self, opts, startrow):
         row = 0
         for opt in opts:
-            if opt["name"].find("<n>") >= 0:
+            print(opt["name"], opt["type"])
+            if opt["name"].find("<n>") >= 0 and opt["type"] not in ("INT", "FLOAT"):
+                print("non-numeric list")
                 # This is a numbered option. Create multiple widgets, each dependent on the previous
                 opt_base = opt["name"][:opt["name"].find("<n>")]
                 opt_suffix = opt["name"][opt["name"].find("<n>") + 3:]

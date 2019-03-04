@@ -11,7 +11,7 @@ import numpy as np
 
 from PySide import QtGui
 
-from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumericOption, OutputNameOption, BoolOption
+from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumberListOption, NumericOption, OutputNameOption, BoolOption
 from quantiphyse.gui.widgets import QpWidget, Citation, TitleWidget, RunBox, WarningBox
 from quantiphyse.utils import QpException
 
@@ -63,6 +63,9 @@ class FabberWidget(QpWidget):
       
     def _options_changed(self):
         self._fabber_options.update(self.options.values())
+        if self._fabber_options.get("model-group", None) == "ALL":
+           self._fabber_options["model-group"] = None
+
         self.debug("Options changed:\n%s", self._fabber_options)
         self._update_params()
 
@@ -178,12 +181,11 @@ class FabberModellingWidget(FabberWidget):
         edit_priors_btn.clicked.connect(self._show_prior_options)
         options_btn.clicked.connect(self._show_general_options)
         
-        model_groups = []
+        model_groups = ["ALL"]
         for group in FabberProcess.api().get_model_groups():
-            if group == "": group = "GENERIC"
             model_groups.append(group.upper())
         self.options.option("model-group").setChoices(model_groups)
-        #self.options.option("model-group").value = "GENERIC"
+        self.options.option("model-group").value = "ALL"
         self._model_group_changed()
 
         self.options.option("model").value = "poly"
@@ -227,12 +229,11 @@ class SimData(FabberWidget):
         self.options.add("Output parameter ROIs", BoolOption(), key="save-rois")
         self.options.option("model-group").sig_changed.connect(self._model_group_changed)
 
-        model_groups = []
+        model_groups = ["ALL"]
         for group in FabberProcess.api().get_model_groups():
-            if group == "": group = "GENERIC"
             model_groups.append(group.upper())
         self.options.option("model-group").setChoices(model_groups)
-        #self.options.option("model-group").value = "GENERIC"
+        self.options.option("model-group").value = "ALL"
         self._model_group_changed()
 
         self.options.option("model").value = "poly"
@@ -243,7 +244,7 @@ class SimData(FabberWidget):
         self.param_values_box.clear()
         for param in self._fabber_params:
             current_values = self._param_test_values.get(param, [1.0])
-            self.param_values_box.add(param, VectorOption(initial=current_values))
+            self.param_values_box.add(param, NumberListOption(initial=current_values))
 
     def _param_values_changed(self):
         self._param_test_values = self.param_values_box.values()
