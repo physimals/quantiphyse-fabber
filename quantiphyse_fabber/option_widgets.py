@@ -396,11 +396,9 @@ class ListOptionWidget(OptionWidget):
         self.widgets.append(self.edit)
 
     def get_value(self):
-        print("returning ", self.edit.value)
         return self.edit.value
         
     def set_value(self, value):
-        print("setting ", value)
         self.edit.value = value
 
     def add(self, grid, row):
@@ -443,7 +441,6 @@ def get_option_widget(opt, **kwargs):
     """
 
     if opt["name"].find("<n>") >= 0:
-        print("numeric list")
         return ListOptionWidget(opt, **kwargs)
     else:
         return OPT_VIEW.get(opt["type"], StringOptionWidget)(opt, **kwargs)
