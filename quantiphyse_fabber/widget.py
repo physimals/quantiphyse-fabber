@@ -201,7 +201,7 @@ class SimData(FabberWidget):
         super(SimData, self).__init__(name="Simulated Fabber Data", icon="fabber", 
                                       desc="Generate test data sets from Fabber models", 
                                       group="Simulation", **kwargs)
-        self._param_test_values = {"c0" : [-100, 0, 100], "c1" : [-10, 0, 10], "c2" : [-1, 0, 1]}
+        self._param_test_values = {}
 
     def init_ui(self):
         FabberWidget.init_ui(self)
@@ -238,6 +238,10 @@ class SimData(FabberWidget):
 
         self.options.option("model").value = "poly"
         self._options_changed()
+
+        # Start with something sensible for the polynomial model
+        self._param_test_values = {"c0" : [-100, 0, 100], "c1" : [-10, 0, 10], "c2" : [-1, 0, 1]}
+        self._update_params()
  
     def _update_params(self):
         FabberWidget._update_params(self)
@@ -245,6 +249,12 @@ class SimData(FabberWidget):
         for param in self._fabber_params:
             current_values = self._param_test_values.get(param, [1.0])
             self.param_values_box.add(param, NumberListOption(initial=current_values))
+            self._param_test_values[param] = current_values
+
+        # Remove references to parameters which no longer exist
+        for param in list(self._param_test_values.keys()):
+            if param not in self._fabber_params:
+                del self._param_test_values[param]
 
     def _param_values_changed(self):
         self._param_test_values = self.param_values_box.values()
