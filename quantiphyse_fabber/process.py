@@ -204,8 +204,8 @@ class FabberProcess(Process):
                         full_data = np.zeros(list(self.grid.shape) + [recombined_data.shape[3],])
                     else:
                         full_data = np.zeros(self.grid.shape)
-                    full_data[self.bb_slices] = recombined_data
-                    self.ivm.add(full_data, grid=self.grid, name=name, make_current=first)
+                    full_data[self.bb_slices] = recombined_data.reshape(full_data[self.bb_slices].shape)
+                    self.ivm.add(full_data, grid=self.grid, name=name, make_current=first, roi=False)
                     first = False
         else:
             # Include the log of the first failed process
