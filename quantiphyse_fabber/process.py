@@ -18,6 +18,9 @@ from quantiphyse.utils import get_plugins, QpException
 
 LOG = logging.getLogger(__name__)
 
+# Maximum size of Fabber log that we are prepared to handle
+MAX_LOG_SIZE=100000
+
 def _make_fabber_progress_cb(worker_id, queue):
     """ 
     Closure which can be used as a progress callback for the C API. Puts the 
@@ -187,23 +190,35 @@ class FabberProcess(Process):
             # Only include log from first process to avoid multiple repetitions
             for out in worker_output:
                 if out and  hasattr(out, "log") and len(out.log) > 0:
-                    self.log(out.log)
+                    # If there was a problem the log could be huge and full of 
+                    # nan messages. So chop it off at some 'reasonable' point
+                    self.log(out.log[:MAX_LOG_SIZE])
+                    if len(out.log) > MAX_LOG_SIZE:
+                        self.log("WARNING: Log was too large - truncated at %i chars" % MAX_LOG_SIZE)
                     break
             first = True
             data_keys = []
             self.data_items = []
             for out in worker_output:
-                if out.data: data_keys = out.data.keys()
+                if out.data: 
+                    data_keys = out.data.keys()
             for key in data_keys:
                 self.debug(key)
                 recombined_data = self.recombine_data([o.data.get(key, None) for o in worker_output])
                 name = self.output_rename.get(key, key)
                 if key is not None:
                     self.data_items.append(name)
+                    if recombined_data.ndim == 2:
+                        recombined_data = np.expand_dims(recombined_data, 2)
+
+                    # The processed data was chopped out of the full data set to just include the
+                    # ROI - so now we need to put it back into a full size data set which is otherwise
+                    # zero.
                     if recombined_data.ndim == 4:
-                        full_data = np.zeros(list(self.grid.shape) + [recombined_data.shape[3],])
+                        shape4d = list(self.grid.shape) + [recombined_data.shape[3],]
+                        full_data = np.zeros(shape4d, dtype=np.float32)
                     else:
-                        full_data = np.zeros(self.grid.shape)
+                        full_data = np.zeros(self.grid.shape, dtype=np.float32)
                     full_data[self.bb_slices] = recombined_data.reshape(full_data[self.bb_slices].shape)
                     self.ivm.add(full_data, grid=self.grid, name=name, make_current=first, roi=False)
                     first = False
