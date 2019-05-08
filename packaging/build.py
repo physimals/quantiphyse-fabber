@@ -43,8 +43,9 @@ def build_plugin(package_name, rootdir, distdir, platform):
     for lib in ["fabbercore_shared", "fabber_models_t1"]:
         shlib_dir, shlib_template = get_lib_template(platform)
         LIB = os.path.join(fsldir, shlib_dir, shlib_template % lib)
-        print("%s -> %s" % (LIB, packagedir))
-        shutil.copy(LIB, packagedir)
+        if os.path.exists(LIB):
+            print("%s -> %s" % (LIB, packagedir))
+            shutil.copy(LIB, packagedir)
 
     # Copy Fabber Python API
     fabmoddir = os.path.join(packagedir, "deps", "fabber")
