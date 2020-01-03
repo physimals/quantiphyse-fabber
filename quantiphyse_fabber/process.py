@@ -114,6 +114,12 @@ class FabberProcess(Process):
             options.pop(key)
         options = new_options
         
+        # Fabber is happy to use 'mask' rather than 'roi' if provided
+        if "mask" in options and "roi" not in options:
+            options["roi"] = options.pop("mask")
+        elif "mask" in options and "roi" in options:
+            raise QpException("ROI and MASK both specified - only one should be given")
+
         data = self.get_data(options, multi=True)
         self.grid = data.grid
         roi = self.get_roi(options, self.grid)
@@ -135,8 +141,9 @@ class FabberProcess(Process):
 
         # Use smallest sub-array of the data which contains all unmasked voxels
         self.bb_slices = roi.get_bounding_box()
-        data_bb = data.raw()[self.bb_slices]
-        mask_bb = roi.raw()[self.bb_slices]
+        self.debug("Using bounding box: %s", self.bb_slices)
+        data_bb = data.raw()[tuple(self.bb_slices)]
+        mask_bb = roi.raw()[tuple(self.bb_slices)]
 
         # Pass in input data. To enable the multiprocessing module to split our volumes
         # up automatically we have to pass the arguments as a single list. This consists of
