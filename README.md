@@ -2,7 +2,7 @@ Fabber plugin for Quantiphyse
 =============================
 
 Quantiphyse is a visualisation and data analysis tool for volumetric
-medical imaging data especially MRI. See https://quantiphyse.org for more
+medical imaging data especially MRI. See https://www.eng.ox.ac.uk/quantiphyse/ for more
 information.
 
 Fabber is a model fitting tool designed to fit nonlinear parameterised 
