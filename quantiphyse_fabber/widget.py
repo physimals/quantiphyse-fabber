@@ -9,10 +9,7 @@ from __future__ import division, unicode_literals, absolute_import, print_functi
 
 import numpy as np
 
-try:
-    from PySide import QtGui, QtCore, QtGui as QtWidgets
-except ImportError:
-    from PySide2 import QtGui, QtCore, QtWidgets
+from PySide2 import QtGui, QtCore, QtWidgets
 
 from quantiphyse.gui.options import OptionBox, DataOption, ChoiceOption, VectorOption, NumberListOption, NumericOption, OutputNameOption, BoolOption
 from quantiphyse.gui.widgets import QpWidget, Citation, TitleWidget, RunBox, WarningBox
@@ -42,7 +39,7 @@ class FabberWidget(QpWidget):
         self._fabber_params = []
 
     def init_ui(self):
-        self.vbox = QtGui.QVBoxLayout()
+        self.vbox = QtWidgets.QVBoxLayout()
         self.setLayout(self.vbox)
 
         title = TitleWidget(self, subtitle="Plugin %s" % __version__, help="fabber")
@@ -166,10 +163,10 @@ class FabberModellingWidget(FabberWidget):
         self.vbox.addWidget(self.run_box)
         self.vbox.addStretch(1)
 
-        model_opts_btn = QtGui.QPushButton('Model Options')
-        method_opts_btn = QtGui.QPushButton('Method Options')
-        edit_priors_btn = QtGui.QPushButton('Edit Priors')
-        options_btn = QtGui.QPushButton('Edit')
+        model_opts_btn = QtWidgets.QPushButton('Model Options')
+        method_opts_btn = QtWidgets.QPushButton('Method Options')
+        edit_priors_btn = QtWidgets.QPushButton('Edit Priors')
+        options_btn = QtWidgets.QPushButton('Edit')
 
         self.options.add("Main input data", DataOption(self.ivm), key="data")
         self.options.add("Model group", ChoiceOption(), key="model-group")
@@ -213,13 +210,13 @@ class SimData(FabberWidget):
         self.param_values_box.sig_changed.connect(self._param_values_changed)
         self.vbox.addWidget(self.param_values_box)
 
-        run_btn = QtGui.QPushButton('Generate test data', self)
+        run_btn = QtWidgets.QPushButton('Generate test data', self)
         run_btn.clicked.connect(self._run)
         self.vbox.addWidget(run_btn)
         
         self.vbox.addStretch(1)
 
-        model_opts_btn = QtGui.QPushButton('Model Options')
+        model_opts_btn = QtWidgets.QPushButton('Model Options')
         model_opts_btn.clicked.connect(self._show_model_options)
 
         self.options.add("Model group", ChoiceOption(), key="model-group")

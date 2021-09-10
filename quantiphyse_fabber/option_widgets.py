@@ -7,10 +7,7 @@ Copyright (c) 2016-2018 University of Oxford, Martin Craig
 import os
 import logging
 
-try:
-    from PySide import QtGui, QtCore, QtGui as QtWidgets
-except ImportError:
-    from PySide2 import QtGui, QtCore, QtWidgets
+from PySide2 import QtGui, QtCore, QtWidgets
 
 from quantiphyse.gui.widgets import OverlayCombo
 from quantiphyse.gui.options import NumberListOption
@@ -19,9 +16,9 @@ LOG = logging.getLogger(__name__)
 
 def get_label(text="", size=None, bold=False, italic=False):
     """
-    :return: QtGui.QLabel with specified text and attributes
+    :return: QtWidgets.QLabel with specified text and attributes
     """
-    label = QtGui.QLabel(text)
+    label = QtWidgets.QLabel(text)
     font = label.font()
     font.setBold(bold)
     font.setItalic(italic)
@@ -63,7 +60,7 @@ class OptionWidget(QtCore.QObject):
             self.enable_cb = None
             self.checked = True
         else:
-            self.enable_cb = QtGui.QCheckBox()
+            self.enable_cb = QtWidgets.QCheckBox()
             self.enable_cb.stateChanged.connect(self._checkbox_toggled)
             self.widgets.append(self.enable_cb)
             self.checked = False
@@ -124,7 +121,7 @@ class OptionWidget(QtCore.QObject):
         Subclasses should call this method first and then add their own specific
         widget to column 1 of the grid
 
-        :param grid: QtGui.QGridLayout 
+        :param grid: QtWidgets.QGridLayout 
         :param row: Row index number
         """
         if self.desc_first:
@@ -136,7 +133,7 @@ class OptionWidget(QtCore.QObject):
         if self.req:
             grid.addWidget(label, row, 0)
         else:
-            hbox = QtGui.QHBoxLayout()
+            hbox = QtWidgets.QHBoxLayout()
             hbox.addWidget(self.enable_cb)
             hbox.addWidget(label, row)
             grid.addLayout(hbox, row, 0)
@@ -169,7 +166,7 @@ class IntegerOptionWidget(OptionWidget):
     """
     def __init__(self, opt, **kwargs):
         OptionWidget.__init__(self, opt, **kwargs)
-        self.spin = QtGui.QSpinBox()
+        self.spin = QtWidgets.QSpinBox()
         self.spin.valueChanged.connect(self.update_options)
         self.widgets.append(self.spin)
     
@@ -195,7 +192,7 @@ class StringOptionWidget(OptionWidget):
     """
     def __init__(self, opt, **kwargs):
         OptionWidget.__init__(self, opt, **kwargs)
-        self.edit = QtGui.QLineEdit()
+        self.edit = QtWidgets.QLineEdit()
         self.edit.editingFinished.connect(self.update_options)
         self.widgets.append(self.edit)
             
@@ -215,16 +212,16 @@ class FileOptionWidget(StringOptionWidget):
     """
     def __init__(self, opt, **kwargs):
         StringOptionWidget.__init__(self, opt, **kwargs)
-        self.hbox = QtGui.QHBoxLayout()
+        self.hbox = QtWidgets.QHBoxLayout()
         self.hbox.addWidget(self.edit)
-        self.btn = QtGui.QPushButton("Choose")
+        self.btn = QtWidgets.QPushButton("Choose")
         self.hbox.addWidget(self.btn)
         self.widgets.append(self.btn)
         self.btn.clicked.connect(self._choose_file)
     
     def _choose_file(self):
-        dialog = QtGui.QFileDialog()
-        dialog.setFileMode(QtGui.QFileDialog.AnyFile)
+        dialog = QtWidgets.QFileDialog()
+        dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
         if dialog.exec_():
             fname = dialog.selectedFiles()[0]
             self.edit.setText(fname)
@@ -244,7 +241,7 @@ class MatrixFileOptionWidget(FileOptionWidget):
     """
     def __init__(self, opt, **kwargs):
         FileOptionWidget.__init__(self, opt, **kwargs)
-        edit_btn = QtGui.QPushButton("Edit")
+        edit_btn = QtWidgets.QPushButton("Edit")
         self.hbox.addWidget(edit_btn)
         self.widgets.append(edit_btn)
         edit_btn.clicked.connect(self._edit_file)
@@ -338,18 +335,18 @@ class MatrixFileOptionWidget(FileOptionWidget):
     def _edit_file(self):
         fname = self.edit.text()
         if fname.strip() == "":
-            msg_box = QtGui.QMessageBox()
+            msg_box = QtWidgets.QMessageBox()
             msg_box.setText("Enter a filename")
-            msg_box.setStandardButtons(QtGui.QMessageBox.Ok)
+            msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
             msg_box.exec_()
             return
         elif not os.path.exists(fname):
-            msg_box = QtGui.QMessageBox()
+            msg_box = QtWidgets.QMessageBox()
             msg_box.setText("File does not exist - create?")
-            msg_box.setStandardButtons(QtGui.QMessageBox.Ok | QtGui.QMessageBox.Cancel)
-            msg_box.setDefaultButton(QtGui.QMessageBox.Ok)
+            msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
+            msg_box.setDefaultButton(QtWidgets.QMessageBox.Ok)
             ret = msg_box.exec_()
-            if ret != QtGui.QMessageBox.Ok:
+            if ret != QtWidgets.QMessageBox.Ok:
                 return
             open(fname, "a").close()
 

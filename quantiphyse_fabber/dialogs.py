@@ -5,10 +5,7 @@ Copyright (c) 2016-2018 University of Oxford, Martin Craig
 """
 import logging
 
-try:
-    from PySide import QtGui, QtCore, QtGui as QtWidgets
-except ImportError:
-    from PySide2 import QtGui, QtCore, QtWidgets
+from PySide2 import QtGui, QtCore, QtWidgets
 
 from quantiphyse.gui.widgets import OverlayCombo
 
@@ -22,9 +19,9 @@ LOG = logging.getLogger(__name__)
 def _del(rundata, key):
     if key in rundata: del rundata[key]
 
-class OptionsDialog(QtGui.QDialog):
+class OptionsDialog(QtWidgets.QDialog):
     """
-    QtGui.QDialog which displays dynamically generated Fabber options (e.g. for method or model)
+    QtWidgets.QDialog which displays dynamically generated Fabber options (e.g. for method or model)
     """
     
     #: Signal when option value is changed
@@ -32,7 +29,7 @@ class OptionsDialog(QtGui.QDialog):
 
     def __init__(self, parent=None, title="Options", desc="", **kwargs):
         super(OptionsDialog, self).__init__(parent)
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         self.setLayout(vbox)
 
         self.title_label = get_label(title, size=20)
@@ -41,18 +38,18 @@ class OptionsDialog(QtGui.QDialog):
         self.desc_label = get_label(desc, bold=True, italic=True)
         vbox.addWidget(self.desc_label)
 
-        self.scroll_area = QtGui.QScrollArea()
+        self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setMinimumHeight(500)
-        self.scroll_area_content = QtGui.QWidget()
-        self.grid = QtGui.QGridLayout(self.scroll_area_content)
+        self.scroll_area_content = QtWidgets.QWidget()
+        self.grid = QtWidgets.QGridLayout(self.scroll_area_content)
         self.scroll_area.setWidget(self.scroll_area_content)
         vbox.addWidget(self.scroll_area)
 
-        button_box = QtGui.QDialogButtonBox()
+        button_box = QtWidgets.QDialogButtonBox()
         button_box.setOrientation(QtCore.Qt.Horizontal)
-        button_box.setStandardButtons(QtGui.QDialogButtonBox.Close)
+        button_box.setStandardButtons(QtWidgets.QDialogButtonBox.Close)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         vbox.addWidget(button_box)
@@ -197,7 +194,7 @@ class PriorsDialog(OptionsDialog):
         prec = self.rundata.get("PSP_byname%i_prec" % prior_idx, "")
         trans = self.rundata.get("PSP_byname%i_transform" % prior_idx, "")
 
-        type_combo = QtGui.QComboBox()
+        type_combo = QtWidgets.QComboBox()
         type_combo.addItem("Normal", "N")
         type_combo.addItem("Image Prior", "I")
         type_combo.addItem("Spatial prior, type M", "M")
@@ -205,48 +202,48 @@ class PriorsDialog(OptionsDialog):
         type_combo.addItem("Spatial prior, type m", "m")
         type_combo.addItem("Spatial prior , type p", "p")
         type_combo.addItem("ARD prior", "A")
-        type_combo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
+        type_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
         type_combo.setCurrentIndex(type_combo.findData(ptype))
         type_combo.currentIndexChanged.connect(self._changed)
         
         image_combo = OverlayCombo(self.ivm, static_only=True)
-        image_combo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
+        image_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
         if image != "":
             image_combo.setCurrentIndex(image_combo.findText(image))
         image_combo.currentIndexChanged.connect(self._changed)
         
-        mean_cb = QtGui.QCheckBox()
+        mean_cb = QtWidgets.QCheckBox()
         mean_cb.setChecked(ptype != "I" and mean != "")
         mean_cb.stateChanged.connect(self._changed)
 
-        mean_edit = QtGui.QLineEdit(mean)
+        mean_edit = QtWidgets.QLineEdit(mean)
         mean_edit.editingFinished.connect(self._changed)
         
-        prec_cb = QtGui.QCheckBox()
+        prec_cb = QtWidgets.QCheckBox()
         prec_cb.setChecked(prec != "")
         prec_cb.stateChanged.connect(self._changed)
 
-        prec_edit = QtGui.QLineEdit(prec)
+        prec_edit = QtWidgets.QLineEdit(prec)
         prec_edit.editingFinished.connect(self._changed)
         
-        trans_combo = QtGui.QComboBox()
+        trans_combo = QtWidgets.QComboBox()
         trans_combo.addItem("Default transformation", "")
         trans_combo.addItem("No transformation", "I")
         trans_combo.addItem("Log transformation", "L")
         trans_combo.addItem("Soft-plus transformation", "S")
         trans_combo.addItem("Fractional transformation", "F")
-        trans_combo.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
+        trans_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
         trans_combo.setCurrentIndex(trans_combo.findData(trans))
         trans_combo.currentIndexChanged.connect(self._changed)
 
         return (type_combo, 
-                QtGui.QLabel("Image: "), 
+                QtWidgets.QLabel("Image: "), 
                 image_combo, 
                 mean_cb, 
-                QtGui.QLabel("Custom mean: "), 
+                QtWidgets.QLabel("Custom mean: "), 
                 mean_edit,
                 prec_cb, 
-                QtGui.QLabel("Custom precision: "), 
+                QtWidgets.QLabel("Custom precision: "), 
                 prec_edit,
                 trans_combo)
 
@@ -318,12 +315,12 @@ class PriorsDialog(OptionsDialog):
         self.prior_widgets = []
         
         if not self.params:
-            self.grid.addWidget(QtGui.QLabel("No parameters found! Make sure model is properly configured"))
+            self.grid.addWidget(QtWidgets.QLabel("No parameters found! Make sure model is properly configured"))
 
         for idx, param in enumerate(self.params):
             self.prior_widgets.append(self._get_widgets(idx))
         
-            self.grid.addWidget(QtGui.QLabel("%s: " % param), idx, 0)
+            self.grid.addWidget(QtWidgets.QLabel("%s: " % param), idx, 0)
             for col, w in enumerate(self.prior_widgets[idx]):
                 self.grid.addWidget(w, idx, col+1)
 
