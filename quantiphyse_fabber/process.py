@@ -124,7 +124,10 @@ class FabberProcess(Process):
         self.grid = data.grid
         roi = self.get_roi(options, self.grid)
 
-        self.output_rename = options.pop("output-rename", {})
+        # Empty batch code can make output-rename None
+        self.output_rename = options.pop("output-rename", None)
+        if not self.output_rename:
+            self.output_rename = {}
 
         # Set some defaults
         options["method"] = options.get("method", "vb")
@@ -210,7 +213,7 @@ class FabberProcess(Process):
                 if out.data: 
                     data_keys = out.data.keys()
             for key in data_keys:
-                self.debug(key)
+                self.debug("Recombining data item: %s" % key)
                 recombined_data = self.recombine_data([o.data.get(key, None) for o in worker_output])
                 name = self.output_rename.get(key, key)
                 if key is not None:
